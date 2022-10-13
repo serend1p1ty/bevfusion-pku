@@ -1,3 +1,4 @@
+import os
 import random
 import warnings
 
@@ -75,11 +76,26 @@ def train_detector(model,
         find_unused_parameters = cfg.get('find_unused_parameters', False)
         # Sets the `find_unused_parameters` parameter in
         # torch.nn.parallel.DistributedDataParallel
-        model = MMDistributedDataParallel(
-            model.cuda(),
-            device_ids=[torch.cuda.current_device()],
-            broadcast_buffers=False,
-            find_unused_parameters=find_unused_parameters)
+        if cfg.get("model_parallelism", False):
+            if callable(getattr(model, "to_multi_cuda_devices", None)):
+                local_rank = int(os.environ['LOCAL_RANK'])
+                os.environ['DEVICE_ID1'] = str(local_rank * 2)
+                os.environ['DEVICE_ID2'] = str(local_rank * 2 + 1)
+                os.environ['MODEL_PARALLELISM'] = "on"
+                model = MMDistributedDataParallel(
+                    model.to_multi_cuda_devices(),
+                    broadcast_buffers=False,
+                    find_unused_parameters=find_unused_parameters)
+                # required by mmcv.runner.TextLoggerHook
+                model.output_device = local_rank * 2 + 1
+            else:
+                raise Exception("This model does not support model parallelism.")
+        else:
+            model = MMDistributedDataParallel(
+                model.cuda(),
+                device_ids=[torch.cuda.current_device()],
+                broadcast_buffers=False,
+                find_unused_parameters=find_unused_parameters)
     else:
         model = MMDataParallel(
             model.cuda(cfg.gpu_ids[0]), device_ids=cfg.gpu_ids)
