@@ -22,6 +22,8 @@ class SparseConvFunction(Function):
     @staticmethod
     def forward(ctx, features, filters, indice_pairs, indice_pair_num,
                 num_activate_out):
+        # force fp16
+        features, filters = features.half(), filters.half()
         ctx.save_for_backward(indice_pairs, indice_pair_num, features, filters)
         return ops.indice_conv(features, filters, indice_pairs,
                                indice_pair_num, num_activate_out, False)
@@ -41,6 +43,8 @@ class SparseInverseConvFunction(Function):
     @staticmethod
     def forward(ctx, features, filters, indice_pairs, indice_pair_num,
                 num_activate_out):
+        # force fp16
+        features, filters = features.half(), filters.half()
         ctx.save_for_backward(indice_pairs, indice_pair_num, features, filters)
         return ops.indice_conv(features, filters, indice_pairs,
                                indice_pair_num, num_activate_out, True, False)
@@ -60,6 +64,8 @@ class SubMConvFunction(Function):
     @staticmethod
     def forward(ctx, features, filters, indice_pairs, indice_pair_num,
                 num_activate_out):
+        # force fp16
+        features, filters = features.half(), filters.half()
         ctx.save_for_backward(indice_pairs, indice_pair_num, features, filters)
         return ops.indice_conv(features, filters, indice_pairs,
                                indice_pair_num, num_activate_out, False, True)

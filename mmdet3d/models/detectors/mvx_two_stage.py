@@ -219,8 +219,6 @@ class MVXTwoStageDetector(Base3DDetector):
         x = self.pts_backbone(x)
         if self.with_pts_neck:
             x = self.pts_neck(x)
-    
-        
         return x
 
     def extract_feat(self, points, img, img_metas, gt_bboxes_3d=None):

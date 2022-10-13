@@ -92,7 +92,7 @@ class SparseEncoder(nn.Module):
             indice_key='spconv_down2',
             conv_type='SparseConv3d')
 
-    # @auto_fp16(apply_to=('voxel_features', ))
+    @auto_fp16(apply_to=('voxel_features', ))
     def forward(self, voxel_features, coors, batch_size):
         """Forward of SparseEncoder.
 
