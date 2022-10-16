@@ -137,7 +137,8 @@ def main():
     else:
         distributed = True
         init_dist(args.launcher, **cfg.dist_params)
-        torch.cuda.set_device(args.local_rank * 2)
+        if cfg.get("model_parallelism", False):
+            torch.cuda.set_device(args.local_rank * 2)
         # re-set gpu_ids with distributed training mode
         _, world_size = get_dist_info()
         cfg.gpu_ids = range(world_size)
