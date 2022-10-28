@@ -190,7 +190,8 @@ def main():
     #     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
     #     print('Convert to SyncBatchNorm')
 
-    if 'freeze_lidar_components' in cfg and cfg['freeze_lidar_components'] is True:
+    if 'freeze_lidar_components' in cfg and cfg[
+            'freeze_lidar_components'] is True:
         logger.info(f"param need to update:")
         param_grad = []
         param_nograd = []
@@ -261,7 +262,7 @@ def main():
 
     if 'load_img_from' in cfg:
         print(cfg.load_img_from)
-        checkpoint= torch.load(cfg.load_img_from, map_location='cpu')
+        checkpoint = torch.load(cfg.load_img_from, map_location='cpu')
         if 'state_dict' in checkpoint:
             state_dict = checkpoint['state_dict']
         elif 'model' in checkpoint:
@@ -286,7 +287,7 @@ def main():
 
     if 'load_lift_from' in cfg:
         print(cfg.load_lift_from)
-        checkpoint= torch.load(cfg.load_lift_from, map_location='cpu')
+        checkpoint = torch.load(cfg.load_lift_from, map_location='cpu')
         if 'state_dict' in checkpoint:
             state_dict = checkpoint['state_dict']
         elif 'model' in checkpoint:

@@ -515,19 +515,20 @@ class DynamicVFE_SST(nn.Module):
             points. Default to False.
     """
 
-    def __init__(self,
-                 in_channels=4,
-                 feat_channels=[],
-                 with_distance=False,
-                 with_cluster_center=False,
-                 with_voxel_center=False,
-                 voxel_size=(0.2, 0.2, 4),
-                 point_cloud_range=(0, -40, -3, 70.4, 40, 1),
-                 norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
-                 mode='max',
-                 fusion_layer=None,
-                 return_point_feats=False,
-                 ):
+    def __init__(
+        self,
+        in_channels=4,
+        feat_channels=[],
+        with_distance=False,
+        with_cluster_center=False,
+        with_voxel_center=False,
+        voxel_size=(0.2, 0.2, 4),
+        point_cloud_range=(0, -40, -3, 70.4, 40, 1),
+        norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
+        mode='max',
+        fusion_layer=None,
+        return_point_feats=False,
+    ):
         super(DynamicVFE_SST, self).__init__()
         assert mode in ['avg', 'max']
         assert len(feat_channels) > 0
@@ -563,10 +564,7 @@ class DynamicVFE_SST(nn.Module):
                 in_filters *= 2
 
             vfe_layers.append(
-                DynamicVFELayer(
-                    in_filters,
-                    out_filters,
-                    norm_cfg))
+                DynamicVFELayer(in_filters, out_filters, norm_cfg))
         self.vfe_layers = nn.ModuleList(vfe_layers)
         self.num_vfe = len(vfe_layers)
         self.vfe_scatter = DynamicScatter(voxel_size, point_cloud_range,
@@ -577,7 +575,6 @@ class DynamicVFE_SST(nn.Module):
         if fusion_layer is not None:
             self.fusion_layer = builder.build_fusion_layer(fusion_layer)
 
-    
     def map_voxel_center_to_point(self, pts_coors, voxel_mean, voxel_coors):
         """Map voxel features to its corresponding points.
 
@@ -620,7 +617,7 @@ class DynamicVFE_SST(nn.Module):
         center_per_point = voxel_mean[voxel_inds, ...]
         return center_per_point
 
-    # if out_fp16=True, the large numbers of points 
+    # if out_fp16=True, the large numbers of points
     # lead to overflow error in following layers
     @force_fp32(out_fp16=False)
     def forward(self,
@@ -670,7 +667,6 @@ class DynamicVFE_SST(nn.Module):
         if self._with_distance:
             points_dist = torch.norm(features[:, :3], 2, 1, keepdim=True)
             features_ls.append(points_dist)
-
 
         # Combine together feature decorations
         features = torch.cat(features_ls, dim=-1)

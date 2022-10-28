@@ -15,7 +15,8 @@ input_modality = dict(
     use_external=False)
 img_scale = (800, 448)
 num_views = 6
-img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+img_norm_cfg = dict(
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
     dict(
         type='LoadPointsFromFile',
@@ -40,10 +41,10 @@ train_pipeline = [
     dict(type='MyNormalize', **img_norm_cfg),
     dict(type='MyPad', size_divisor=32),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
-    dict(type='Collect3D', keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'])
+    dict(
+        type='Collect3D',
+        keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
-
-
 
 test_pipeline = [
     dict(
@@ -72,7 +73,7 @@ test_pipeline = [
             dict(
                 type='DefaultFormatBundle3D',
                 class_names=class_names,
-                ),
+            ),
             dict(type='Collect3D', keys=['points', 'img'])
         ])
 ]
@@ -80,16 +81,16 @@ data = dict(
     samples_per_gpu=2,
     workers_per_gpu=6,
     train=dict(
-            type=dataset_type,
-            data_root=data_root,
-            num_views=num_views,
-            ann_file=data_root + '/nuscenes_infos_train.pkl',
-            load_interval=1,
-            pipeline=train_pipeline,
-            classes=class_names,
-            modality=input_modality,
-            test_mode=False,
-            box_type_3d='LiDAR'),
+        type=dataset_type,
+        data_root=data_root,
+        num_views=num_views,
+        ann_file=data_root + '/nuscenes_infos_train.pkl',
+        load_interval=1,
+        pipeline=train_pipeline,
+        classes=class_names,
+        modality=input_modality,
+        test_mode=False,
+        box_type_3d='LiDAR'),
     val=dict(
         type=dataset_type,
         data_root=data_root,

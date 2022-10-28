@@ -1,7 +1,6 @@
 _base_ = [
     '../../_base_/datasets/nusc_fov90_tf.py',
     '../../_base_/schedules/schedule_1x.py',
-
 ]
 point_cloud_range = [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]
 class_names = [
@@ -10,8 +9,8 @@ class_names = [
 ]
 voxel_size = [0.075, 0.075, 0.2]
 out_size_factor = 8
-final_dim=(900, 1600) # HxW
-downsample=8
+final_dim = (900, 1600)  # HxW
+downsample = 8
 imc = 256
 
 input_modality = dict(
@@ -24,35 +23,35 @@ num_views = 6
 model = dict(
     type='BEVF_TransFusion',
     se=False,
-    camera_stream=True, 
-    grid=0.6, 
+    camera_stream=True,
+    grid=0.6,
     num_views=6,
     final_dim=final_dim,
-    downsample=downsample, 
-    imc=imc, 
+    downsample=downsample,
+    imc=imc,
     lic=256 * 2,
     lc_fusion=True,
-    pc_range = point_cloud_range,
+    pc_range=point_cloud_range,
     img_backbone=dict(
         type='CBSwinTransformer',
-                embed_dim=96,
-                depths=[2, 2, 6, 2],
-                num_heads=[3, 6, 12, 24],
-                window_size=7,
-                mlp_ratio=4.,
-                qkv_bias=True,
-                qk_scale=None,
-                drop_rate=0.,
-                attn_drop_rate=0.,
-                drop_path_rate=0.2,
-                ape=False,
-                patch_norm=True,
-                out_indices=(0, 1, 2, 3),
-                use_checkpoint=False),
+        embed_dim=96,
+        depths=[2, 2, 6, 2],
+        num_heads=[3, 6, 12, 24],
+        window_size=7,
+        mlp_ratio=4.,
+        qkv_bias=True,
+        qk_scale=None,
+        drop_rate=0.,
+        attn_drop_rate=0.,
+        drop_path_rate=0.2,
+        ape=False,
+        patch_norm=True,
+        out_indices=(0, 1, 2, 3),
+        use_checkpoint=False),
     img_neck=dict(
         type='FPNC',
         final_dim=final_dim,
-        downsample=downsample, 
+        downsample=downsample,
         in_channels=[96, 192, 384, 768],
         out_channels=256,
         outC=imc,
@@ -73,7 +72,8 @@ model = dict(
         sparse_shape=[41, 1440, 1440],
         output_channels=128,
         order=('conv', 'norm', 'act'),
-        encoder_channels=((16, 16, 32), (32, 32, 64), (64, 64, 128), (128, 128)),
+        encoder_channels=((16, 16, 32), (32, 32, 64), (64, 64, 128), (128,
+                                                                      128)),
         encoder_paddings=((0, 0, 1), (0, 0, 1), (0, 0, [0, 1, 1]), (0, 0)),
         block_type='basicblock'),
     pts_backbone=dict(
@@ -112,7 +112,8 @@ model = dict(
         dropout=0.1,
         bn_momentum=0.1,
         activation='relu',
-        common_heads=dict(center=(2, 2), height=(1, 2), dim=(3, 2), rot=(2, 2), vel=(2, 2)),
+        common_heads=dict(
+            center=(2, 2), height=(1, 2), dim=(3, 2), rot=(2, 2), vel=(2, 2)),
         bbox_coder=dict(
             type='TransFusionBBoxCoder',
             pc_range=point_cloud_range[:2],
@@ -122,10 +123,17 @@ model = dict(
             score_threshold=0.0,
             code_size=10,
         ),
-        loss_cls=dict(type='FocalLoss', use_sigmoid=True, gamma=2, alpha=0.25, reduction='mean', loss_weight=1.0),
+        loss_cls=dict(
+            type='FocalLoss',
+            use_sigmoid=True,
+            gamma=2,
+            alpha=0.25,
+            reduction='mean',
+            loss_weight=1.0),
         # loss_iou=dict(type='CrossEntropyLoss', use_sigmoid=True, reduction='mean', loss_weight=0.0),
         loss_bbox=dict(type='L1Loss', reduction='mean', loss_weight=0.25),
-        loss_heatmap=dict(type='GaussianFocalLoss', reduction='mean', loss_weight=1.0),
+        loss_heatmap=dict(
+            type='GaussianFocalLoss', reduction='mean', loss_weight=1.0),
     ),
     train_cfg=dict(
         pts=dict(
@@ -133,10 +141,10 @@ model = dict(
             assigner=dict(
                 type='HungarianAssigner3D',
                 iou_calculator=dict(type='BboxOverlaps3D', coordinate='lidar'),
-                cls_cost=dict(type='FocalLossCost', gamma=2, alpha=0.25, weight=0.15),
+                cls_cost=dict(
+                    type='FocalLossCost', gamma=2, alpha=0.25, weight=0.15),
                 reg_cost=dict(type='BBoxBEVL1Cost', weight=0.25),
-                iou_cost=dict(type='IoU3DCost', weight=0.25)
-            ),
+                iou_cost=dict(type='IoU3DCost', weight=0.25)),
             pos_weight=-1,
             gaussian_overlap=0.1,
             min_radius=2,
@@ -154,12 +162,18 @@ model = dict(
             voxel_size=voxel_size[:2],
             nms_type=None,
         )))
-optimizer = dict(type='AdamW', lr=0.0001, betas=(0.9, 0.999), weight_decay=0.05,
-                 paramwise_cfg=dict(custom_keys={'absolute_pos_embed': dict(decay_mult=0.),
-                                                 'relative_position_bias_table': dict(decay_mult=0.),
-                                                 'norm': dict(decay_mult=0.)}))
+optimizer = dict(
+    type='AdamW',
+    lr=0.0001,
+    betas=(0.9, 0.999),
+    weight_decay=0.05,
+    paramwise_cfg=dict(
+        custom_keys={
+            'absolute_pos_embed': dict(decay_mult=0.),
+            'relative_position_bias_table': dict(decay_mult=0.),
+            'norm': dict(decay_mult=0.)
+        }))
 optimizer_config = dict(grad_clip=dict(max_norm=10, norm_type=2))
-
 
 checkpoint_config = dict(interval=1)
 log_config = dict(
@@ -176,5 +190,5 @@ gpu_ids = range(0, 8)
 
 data = dict(
     samples_per_gpu=2,
-    workers_per_gpu=6,)
-
+    workers_per_gpu=6,
+)

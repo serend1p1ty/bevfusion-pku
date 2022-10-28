@@ -1,21 +1,20 @@
 _base_ = [
-    '../_base_/datasets/nusc_pp.py',
-    '../_base_/schedules/schedule_1x.py',
+    '../_base_/datasets/nusc_pp.py', '../_base_/schedules/schedule_1x.py',
     '../_base_/default_runtime.py'
 ]
-final_dim=(900, 1600) # HxW
-downsample=8
+final_dim = (900, 1600)  # HxW
+downsample = 8
 voxel_size = [0.25, 0.25, 8]
-imc=256
+imc = 256
 model = dict(
     type='BEVF_FasterRCNN',
     se=True,
     lc_fusion=True,
-    camera_stream=True, 
-    grid=0.5, 
+    camera_stream=True,
+    grid=0.5,
     num_views=6,
     final_dim=final_dim,
-    downsample=downsample, 
+    downsample=downsample,
     imc=imc,
     pts_voxel_layer=dict(
         max_num_points=64,
@@ -66,7 +65,7 @@ model = dict(
     img_neck=dict(
         type='FPNC',
         final_dim=final_dim,
-        downsample=downsample, 
+        downsample=downsample,
         in_channels=[96, 192, 384, 768],
         out_channels=256,
         outC=imc,
@@ -139,16 +138,22 @@ model = dict(
             min_bbox_size=0,
             max_num=500)))
 
-
 data = dict(
     samples_per_gpu=2,
-    workers_per_gpu=6,)
+    workers_per_gpu=6,
+)
 
-optimizer = dict(type='AdamW', lr=0.001, betas=(0.9, 0.999), weight_decay=0.05,
-                 paramwise_cfg=dict(custom_keys={'absolute_pos_embed': dict(decay_mult=0.),
-                                                 'relative_position_bias_table': dict(decay_mult=0.),
-                                                 'norm': dict(decay_mult=0.)}))
+optimizer = dict(
+    type='AdamW',
+    lr=0.001,
+    betas=(0.9, 0.999),
+    weight_decay=0.05,
+    paramwise_cfg=dict(
+        custom_keys={
+            'absolute_pos_embed': dict(decay_mult=0.),
+            'relative_position_bias_table': dict(decay_mult=0.),
+            'norm': dict(decay_mult=0.)
+        }))
 
-load_lift_from = 'work_dirs/bevf_pp_4x8_2x_nusc_cam/epoch_24.pth'     #####load cam stream
+load_lift_from = 'work_dirs/bevf_pp_4x8_2x_nusc_cam/epoch_24.pth'  #####load cam stream
 load_from = 'work_dirs/hv_pointpillars_secfpn_sbn-all_4x8_2x_nus-3d/epoch_24.pth'  #####load lidar stream
-

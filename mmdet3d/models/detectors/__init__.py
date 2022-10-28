@@ -6,6 +6,7 @@ from .transfusion import TransFusionDetector
 from .bevf_centerpoint import BEVF_CenterPoint
 from .bevf_faster_rcnn import BEVF_FasterRCNN
 from .bevf_transfusion import BEVF_TransFusion
+
 __all__ = [
     'Base3DDetector',
     'MVXTwoStageDetector',

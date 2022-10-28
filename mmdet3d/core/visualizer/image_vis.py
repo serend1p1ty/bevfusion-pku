@@ -9,12 +9,13 @@ from matplotlib import pyplot as plt
 
 
 def translate(points: np.ndarray, x: np.ndarray) -> None:
-        """
+    """
         Applies a translation to the point cloud.
         :param x: <np.float: 3, 1>. Translation in x, y, z.
         """
-        for i in range(3):
-            points[i, :] = points[i, :] + x[i]
+    for i in range(3):
+        points[i, :] = points[i, :] + x[i]
+
 
 def rotate(points: np.ndarray, rot_matrix: np.ndarray) -> None:
     """
@@ -23,7 +24,9 @@ def rotate(points: np.ndarray, rot_matrix: np.ndarray) -> None:
     """
     points[:3, :] = np.dot(rot_matrix, points[:3, :])
 
-def view_points(points: np.ndarray, view: np.ndarray, normalize: bool) -> np.ndarray:
+
+def view_points(points: np.ndarray, view: np.ndarray,
+                normalize: bool) -> np.ndarray:
     """
     This is a helper class that maps 3d points to a 2d plane. It can be used to implement both perspective and
     orthographic projections. It first applies the dot product between the points and the view. By convention,
@@ -63,6 +66,7 @@ def view_points(points: np.ndarray, view: np.ndarray, normalize: bool) -> np.nda
 
     return points
 
+
 def vis_depth(img, depth, name):
     from matplotlib import pyplot as plt
     import cv2
@@ -74,11 +78,11 @@ def vis_depth(img, depth, name):
         y.append(np.arange(w))
     x = np.concatenate(x)
     y = np.concatenate(y)
-    img= ((img.permute(1,2,0)+3)/6).cpu().numpy().astype(np.float32)
-    if img.shape[0]!=h:
+    img = ((img.permute(1, 2, 0) + 3) / 6).cpu().numpy().astype(np.float32)
+    if img.shape[0] != h:
         img = cv2.resize(img, (w, h))
     depth = depth.view(-1).cpu().numpy()
-    mask = depth>0
+    mask = depth > 0
     x = x[mask].astype(np.int32)
     y = y[mask].astype(np.int32)
     depth = depth[mask]
@@ -86,14 +90,16 @@ def vis_depth(img, depth, name):
     ax.imshow(img.astype(np.float32))
     ax.scatter(y, x, c=depth, s=1)
     ax.axis('off')
-    fig.savefig('work_dirs/img_{}.png'.format(name),bbox_inches='tight',pad_inches = 0)
+    fig.savefig(
+        'work_dirs/img_{}.png'.format(name), bbox_inches='tight', pad_inches=0)
 
-def map_pointcloud_to_image(points, 
-                                img,
-                                sensor2lidar_r,
-                                sensor2lidar_t,
-                                camera_intrinsic,
-                                show=False):
+
+def map_pointcloud_to_image(points,
+                            img,
+                            sensor2lidar_r,
+                            sensor2lidar_t,
+                            camera_intrinsic,
+                            show=False):
     """
     Given a point sensor (lidar/radar) token and camera sample_data token, load pointcloud and map it to the image
     plane.
@@ -114,7 +120,7 @@ def map_pointcloud_to_image(points,
     points = copy.deepcopy(points.T)
     translate(points, -sensor2lidar_t)
     rotate(points, sensor2lidar_r.T)
-    
+
     # Fifth step: actually take a "picture" of the point cloud.
     # Grab the depths (camera frame z axis points away from the camera).
     depths = points[2, :]
@@ -134,8 +140,8 @@ def map_pointcloud_to_image(points,
     points = points[:, mask]
     coloring = coloring[mask]
     depth_map = np.zeros((img.shape[0], img.shape[1]), dtype=np.float32)
-    xs = np.minimum((points[0,:] + 0.5).astype(np.int32), depth_map.shape[1])
-    ys = np.minimum((points[1,:] + 0.5).astype(np.int32), depth_map.shape[0])
+    xs = np.minimum((points[0, :] + 0.5).astype(np.int32), depth_map.shape[1])
+    ys = np.minimum((points[1, :] + 0.5).astype(np.int32), depth_map.shape[0])
     for x, y, c in zip(xs, ys, coloring):
         depth_map[y, x] = c
     if show:
@@ -146,7 +152,8 @@ def map_pointcloud_to_image(points,
         ax.imshow(img)
         ax.scatter(points[0, :], points[1, :], c=coloring, s=1)
         ax.axis('off')
-        fig.savefig('work_dirs/img_depth.png',bbox_inches='tight',pad_inches = 0)
+        fig.savefig(
+            'work_dirs/img_depth.png', bbox_inches='tight', pad_inches=0)
     return depth_map
 
 

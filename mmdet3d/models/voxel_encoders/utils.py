@@ -118,8 +118,7 @@ class DynamicVFELayer(nn.Module):
     def __init__(self,
                  in_channels,
                  out_channels,
-                 norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01)
-                 ):
+                 norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01)):
         super(DynamicVFELayer, self).__init__()
         self.fp16_enabled = False
         # self.units = int(out_channels / 2)

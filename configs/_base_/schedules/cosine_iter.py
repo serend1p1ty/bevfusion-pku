@@ -5,7 +5,7 @@
 # optimizer
 # This schedule is mainly used by models on nuScenes dataset
 # optimizer = dict(type='AdamW', lr=1e-3, weight_decay=0.01)
-lr=1e-4
+lr = 1e-4
 optimizer = dict(
     type='AdamW',
     lr=lr,

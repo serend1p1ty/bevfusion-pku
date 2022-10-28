@@ -1,48 +1,55 @@
 _base_ = [
     '../../_base_/datasets/waymoD5-3d-3class_cam.py',
-    '../../_base_/schedules/schedule_2x.py',
-    '../../_base_/default_runtime.py'
+    '../../_base_/schedules/schedule_2x.py', '../../_base_/default_runtime.py'
 ]
-optimizer = dict(_delete_=True, type='AdamW', lr=0.0001/2, betas=(0.9, 0.999), weight_decay=0.05,
-                 paramwise_cfg=dict(custom_keys={'absolute_pos_embed': dict(decay_mult=0.),
-                                                 'relative_position_bias_table': dict(decay_mult=0.),
-                                                 'norm': dict(decay_mult=0.)}))
+optimizer = dict(
+    _delete_=True,
+    type='AdamW',
+    lr=0.0001 / 2,
+    betas=(0.9, 0.999),
+    weight_decay=0.05,
+    paramwise_cfg=dict(
+        custom_keys={
+            'absolute_pos_embed': dict(decay_mult=0.),
+            'relative_position_bias_table': dict(decay_mult=0.),
+            'norm': dict(decay_mult=0.)
+        }))
 
-final_dim=(1920, 1280) # HxW
+final_dim = (1920, 1280)  # HxW
 # (468, 468)
-downsample=8
+downsample = 8
 
 model = dict(
     type='BEVF_FasterRCNN',
     freeze_img=False,
-    camera_stream=True, 
+    camera_stream=True,
     lss=False,
-    camera_depth_range=[4.0, 45.0, 1.0], 
-    pc_range=[-74.88, -74.88, -2, 74.88, 74.88, 4], 
-    grid=0.32, 
+    camera_depth_range=[4.0, 45.0, 1.0],
+    pc_range=[-74.88, -74.88, -2, 74.88, 74.88, 4],
+    grid=0.32,
     num_views=5,
     final_dim=final_dim,
-    downsample=downsample, 
+    downsample=downsample,
     img_backbone=dict(
         type='CBSwinTransformer',
-                embed_dim=96,
-                depths=[2, 2, 6, 2],
-                num_heads=[3, 6, 12, 24],
-                window_size=7,
-                mlp_ratio=4.,
-                qkv_bias=True,
-                qk_scale=None,
-                drop_rate=0.,
-                attn_drop_rate=0.,
-                drop_path_rate=0.2,
-                ape=False,
-                patch_norm=True,
-                out_indices=(0, 1, 2, 3),
-                use_checkpoint=False),
+        embed_dim=96,
+        depths=[2, 2, 6, 2],
+        num_heads=[3, 6, 12, 24],
+        window_size=7,
+        mlp_ratio=4.,
+        qkv_bias=True,
+        qk_scale=None,
+        drop_rate=0.,
+        attn_drop_rate=0.,
+        drop_path_rate=0.2,
+        ape=False,
+        patch_norm=True,
+        out_indices=(0, 1, 2, 3),
+        use_checkpoint=False),
     img_neck=dict(
         type='FPNC',
         final_dim=final_dim,
-        downsample=downsample, 
+        downsample=downsample,
         in_channels=[96, 192, 384, 768],
         out_channels=256,
         use_adp=True,
@@ -118,10 +125,10 @@ model = dict(
             min_bbox_size=0,
             max_num=500)))
 
-
 data = dict(
     samples_per_gpu=2,
-    workers_per_gpu=4,)
+    workers_per_gpu=4,
+)
 
 load_img_from = 'work_dirs/mask_rcnn_dbswin-t_fpn_3x_nuim_cocopre/epoch_36.pth'
 # fp16 = dict(loss_scale=32.0)

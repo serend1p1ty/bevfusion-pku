@@ -10,13 +10,8 @@ from .bevf_faster_rcnn import BEVF_FasterRCNN
 class BEVF_CenterPoint(BEVF_FasterRCNN):
     """Base class of Multi-modality VoxelNet."""
 
-    def __init__(self,
-                **kwargs
-                 ):
-        super(BEVF_CenterPoint,
-              self).__init__(
-                            **kwargs
-                             )
+    def __init__(self, **kwargs):
+        super(BEVF_CenterPoint, self).__init__(**kwargs)
 
     def extract_pts_feat(self, pts, img_feats, img_metas):
         """Extract features of points."""

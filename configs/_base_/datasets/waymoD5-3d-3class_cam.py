@@ -15,7 +15,8 @@ point_cloud_range = [-74.88, -74.88, -2, 74.88, 74.88, 4]
 input_modality = dict(use_lidar=True, use_camera=True)
 # img_scale = (1920, 1280)
 img_scale = (640, 960)
-img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+img_norm_cfg = dict(
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 num_views = 5
 
 train_pipeline = [
@@ -38,7 +39,9 @@ train_pipeline = [
     dict(type='MyNormalize', **img_norm_cfg),
     dict(type='MyPad', size_divisor=32),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
-    dict(type='Collect3D', keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'])
+    dict(
+        type='Collect3D',
+        keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 test_pipeline = [
     dict(

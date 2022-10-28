@@ -153,8 +153,7 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
         Returns:
             dict: Losses of different branches.
         """
-        feature_dict = self.extract_feat(
-            points, img=img, img_metas=img_metas)
+        feature_dict = self.extract_feat(points, img=img, img_metas=img_metas)
         img_feats = feature_dict['img_feats']
         pts_feats = feature_dict['pts_feats']
         depth_dist = feature_dict['depth_dist']
@@ -170,9 +169,9 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
                         img_feats[i] = img_feats[i].cuda(device2)
                 for i, _ in enumerate(gt_labels_3d):
                     gt_labels_3d[i] = gt_labels_3d[i].cuda(device2)
-            losses_pts = self.forward_pts_train(pts_feats, img_feats, gt_bboxes_3d,
-                                                gt_labels_3d, img_metas,
-                                                gt_bboxes_ignore)
+            losses_pts = self.forward_pts_train(pts_feats, img_feats,
+                                                gt_bboxes_3d, gt_labels_3d,
+                                                img_metas, gt_bboxes_ignore)
             losses.update(losses_pts)
         if img_feats:
             losses_img = self.forward_img_train(
@@ -183,7 +182,11 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
                 gt_bboxes_ignore=gt_bboxes_ignore,
                 proposals=proposals)
             if img_depth is not None:
-                loss_depth = self.depth_dist_loss(depth_dist, img_depth, loss_method=self.img_depth_loss_method, img=img) * self.img_depth_loss_weight
+                loss_depth = self.depth_dist_loss(
+                    depth_dist,
+                    img_depth,
+                    loss_method=self.img_depth_loss_method,
+                    img=img) * self.img_depth_loss_weight
                 losses.update(img_depth_loss=loss_depth)
             losses.update(losses_img)
         return losses
@@ -210,7 +213,8 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
         Returns:
             dict: Losses of each branch.
         """
-        outs = self.pts_bbox_head(pts_feats, img_feats, img_metas, gt_bboxes_3d)
+        outs = self.pts_bbox_head(pts_feats, img_feats, img_metas,
+                                  gt_bboxes_3d)
         loss_inputs = [gt_bboxes_3d, gt_labels_3d, outs]
         losses = self.pts_bbox_head.loss(*loss_inputs)
         return losses
@@ -228,8 +232,7 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
 
     def simple_test(self, points, img_metas, img=None, rescale=False):
         """Test function without augmentaiton."""
-        feature_dict = self.extract_feat(
-            points, img=img, img_metas=img_metas)
+        feature_dict = self.extract_feat(points, img=img, img_metas=img_metas)
         img_feats = feature_dict['img_feats']
         pts_feats = feature_dict['pts_feats']
 

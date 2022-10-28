@@ -28,7 +28,8 @@ file_client_args = dict(backend='disk')
 #     }))
 img_scale = (800, 448)
 num_views = 6
-img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+img_norm_cfg = dict(
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 
 train_pipeline = [
     dict(
@@ -41,7 +42,7 @@ train_pipeline = [
         type='LoadPointsFromMultiSweeps',
         point_cloud_angle_range=[-90, 90],
         sweeps_num=9,
-        use_dim=[0, 1, 2, 3, 4],        
+        use_dim=[0, 1, 2, 3, 4],
         file_client_args=file_client_args),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
     dict(type='LoadMultiViewImageFromFiles'),
@@ -53,7 +54,9 @@ train_pipeline = [
     dict(type='MyNormalize', **img_norm_cfg),
     dict(type='MyPad', size_divisor=32),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
-    dict(type='Collect3D', keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'])
+    dict(
+        type='Collect3D',
+        keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 test_pipeline = [
     dict(
@@ -94,19 +97,18 @@ data = dict(
     samples_per_gpu=4,
     workers_per_gpu=6,
     train=dict(
-            type=dataset_type,
-            data_root=data_root,
-            num_views=num_views,
-            ann_file=data_root + 'nuscenes_infos_train.pkl',
-            pipeline=train_pipeline,
-            classes=class_names,
-            modality=input_modality,
-            test_mode=False,
-            use_valid_flag=True,
-            # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-            # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-            box_type_3d='LiDAR'
-        ),
+        type=dataset_type,
+        data_root=data_root,
+        num_views=num_views,
+        ann_file=data_root + 'nuscenes_infos_train.pkl',
+        pipeline=train_pipeline,
+        classes=class_names,
+        modality=input_modality,
+        test_mode=False,
+        use_valid_flag=True,
+        # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
+        # and box_type_3d='Depth' in sunrgbd and scannet dataset.
+        box_type_3d='LiDAR'),
     val=dict(
         type=dataset_type,
         data_root=data_root,

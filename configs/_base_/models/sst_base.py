@@ -1,15 +1,18 @@
 # Configurations of neck, head and assigner, same as PointPillar
 model = dict(
     type='DynamicVoxelNet',
-
     neck=dict(
         type='SECONDFPN',
         norm_cfg=dict(type='naiveSyncBN2d', eps=1e-3, momentum=0.01),
-        in_channels=[128,],
-        upsample_strides=[1,],
-        out_channels=[384, ]
-    ),
-
+        in_channels=[
+            128,
+        ],
+        upsample_strides=[
+            1,
+        ],
+        out_channels=[
+            384,
+        ]),
     bbox_head=dict(
         type='Anchor3DHead',
         num_classes=3,
@@ -40,8 +43,7 @@ model = dict(
             loss_weight=1.0),
         loss_bbox=dict(type='L1Loss', loss_weight=0.5),
         loss_dir=dict(
-            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.2)
-    ),
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.2)),
     # model training and testing settings
     train_cfg=dict(
         assigner=[
@@ -72,12 +74,10 @@ model = dict(
         pos_weight=-1,
         debug=False),
     test_cfg=dict(
-            use_rotate_nms=True,
-            nms_across_levels=False,
-            nms_pre=4096,
-            nms_thr=0.25,
-            score_thr=0.1,
-            min_bbox_size=0,
-            max_num=500
-    )
-)
+        use_rotate_nms=True,
+        nms_across_levels=False,
+        nms_pre=4096,
+        nms_thr=0.25,
+        score_thr=0.1,
+        min_bbox_size=0,
+        max_num=500))

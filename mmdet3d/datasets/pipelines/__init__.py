@@ -8,10 +8,11 @@ from .test_time_aug import MultiScaleFlipAug3D
 from .transforms_3d import (BackgroundPointsFilter, GlobalRotScaleTrans,
                             IndoorPointSample, ObjectNoise, ObjectRangeFilter,
                             ObjectSample, PointShuffle, PointsRangeFilter,
-                            RandomFlip3D, VoxelBasedPointSampler, Randomdropforeground)
+                            RandomFlip3D, VoxelBasedPointSampler,
+                            Randomdropforeground)
 from .transforms_2d import ResizeMultiViewImage, NormalizeMultiViewImage, PadMultiViewImage
 # from .transforms_2d import (
-#     PadMultiViewImage, NormalizeMultiviewImage, 
+#     PadMultiViewImage, NormalizeMultiviewImage,
 #     PhotoMetricDistortionMultiViewImage, CropMultiViewImage,
 #     RandomScaleImageMultiViewImage,
 #     HorizontalRandomFlipMultiViewImage)
@@ -23,9 +24,9 @@ __all__ = [
     'DefaultFormatBundle', 'DefaultFormatBundle3D', 'DataBaseSampler',
     'NormalizePointsColor', 'LoadAnnotations3D', 'IndoorPointSample',
     'PointSegClassMapping', 'MultiScaleFlipAug3D', 'LoadPointsFromMultiSweeps',
-    'BackgroundPointsFilter', 'VoxelBasedPointSampler',
-    'PadMultiViewImage', 'NormalizeMultiViewImage', 'ResizeMultiViewImage', 'Randomdropforeground'
-    # 'PadMultiViewImage', 'NormalizeMultiviewImage', 
+    'BackgroundPointsFilter', 'VoxelBasedPointSampler', 'PadMultiViewImage',
+    'NormalizeMultiViewImage', 'ResizeMultiViewImage', 'Randomdropforeground'
+    # 'PadMultiViewImage', 'NormalizeMultiviewImage',
     # 'PhotoMetricDistortionMultiViewImage', 'CropMultiViewImage',
     # 'RandomScaleImageMultiViewImage', 'HorizontalRandomFlipMultiViewImage'
 ]

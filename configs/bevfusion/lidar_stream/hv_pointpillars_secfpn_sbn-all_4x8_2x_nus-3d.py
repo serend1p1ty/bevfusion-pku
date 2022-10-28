@@ -40,4 +40,3 @@ model = dict(
             custom_values=[0, 0],
             rotations=[0, 1.57],
             reshape_out=True)))
-

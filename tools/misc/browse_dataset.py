@@ -141,7 +141,7 @@ def show_proj_bbox_img(input, out_dir, show=False, is_nus_mono=False):
     img = input['img']._data.numpy()
     # need to transpose channel to first dim
     print(img.shape)
-    if len(img.shape)==4:
+    if len(img.shape) == 4:
         img = img[0]
         print(img.shape)
     print(img.shape)

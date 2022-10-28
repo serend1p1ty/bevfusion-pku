@@ -1,26 +1,25 @@
 _base_ = [
     '../_base_/datasets/waymoD5-3d-3class_cam.py',
-    '../_base_/schedules/schedule_1x.py',
-    '../_base_/default_runtime.py'
+    '../_base_/schedules/schedule_1x.py', '../_base_/default_runtime.py'
 ]
-final_dim=(1920, 1280) # HxW
-downsample=8
+final_dim = (1920, 1280)  # HxW
+downsample = 8
 voxel_size = [0.32, 0.32, 6]
 
-imc=256
+imc = 256
 model = dict(
     type='BEVF_FasterRCNN',
     freeze_img=True,
     lss=False,
     se=True,
     lc_fusion=True,
-    camera_stream=True, 
-    camera_depth_range=[4.0, 45.0, 1.0], 
-    pc_range=[-74.88, -74.88, -2, 74.88, 74.88, 4], 
-    grid=0.32, 
+    camera_stream=True,
+    camera_depth_range=[4.0, 45.0, 1.0],
+    pc_range=[-74.88, -74.88, -2, 74.88, 74.88, 4],
+    grid=0.32,
     num_views=5,
     final_dim=final_dim,
-    downsample=downsample, 
+    downsample=downsample,
     imc=imc,
     pts_voxel_layer=dict(
         max_num_points=20,
@@ -71,7 +70,7 @@ model = dict(
     img_neck=dict(
         type='FPNC',
         final_dim=final_dim,
-        downsample=downsample, 
+        downsample=downsample,
         in_channels=[96, 192, 384, 768],
         out_channels=256,
         outC=imc,
@@ -148,18 +147,24 @@ model = dict(
             min_bbox_size=0,
             max_num=500)))
 
-
 data = dict(
     samples_per_gpu=2,
-    workers_per_gpu=6,)
+    workers_per_gpu=6,
+)
 
-optimizer = dict(type='AdamW', lr=0.001/2, betas=(0.9, 0.999), weight_decay=0.05,
-                 paramwise_cfg=dict(custom_keys={'absolute_pos_embed': dict(decay_mult=0.),
-                                                 'relative_position_bias_table': dict(decay_mult=0.),
-                                                 'norm': dict(decay_mult=0.)}))
+optimizer = dict(
+    type='AdamW',
+    lr=0.001 / 2,
+    betas=(0.9, 0.999),
+    weight_decay=0.05,
+    paramwise_cfg=dict(
+        custom_keys={
+            'absolute_pos_embed': dict(decay_mult=0.),
+            'relative_position_bias_table': dict(decay_mult=0.),
+            'norm': dict(decay_mult=0.)
+        }))
 
 # load_lift_from = 'work_dirs/bevf_pp_4x8_2x_nusc_cam/epoch_24.pth'     #####load cam stream
 load_img_from = 'work_dirs/mask_rcnn_dbswin-t_fpn_3x_nuim_cocopre/epoch_36.pth'
 
 load_from = 'work_dirs/hv_pointpillars_secfpn_sbn_2x16_2x_waymoD5-3d-3class_20200831_204144-d1a706b1.pth'  #####load lidar stream
-

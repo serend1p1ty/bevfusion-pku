@@ -9,6 +9,7 @@ from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines import LoadAnnotations
 import os
 
+
 @PIPELINES.register_module()
 class MyResize(object):
     """Resize images & bbox & mask.
@@ -195,7 +196,8 @@ class MyResize(object):
                     img, scale_factor = mmcv.imrescale(
                         results[key][idx],
                         results['scale'],
-                        interpolation='bilinear' if key=='img' else 'nearest',
+                        interpolation='bilinear'
+                        if key == 'img' else 'nearest',
                         return_scale=True,
                         backend=self.backend)
                     # the w_scale and h_scale has minor difference
@@ -333,10 +335,11 @@ class MyNormalize(object):
                 result dict.
         """
         for key in results.get('img_fields', ['img']):
-            if key =='img_depth':
+            if key == 'img_depth':
                 continue
             for idx in range(len(results['img'])):
-                results[key][idx] = mmcv.imnormalize(results[key][idx], self.mean, self.std,
+                results[key][idx] = mmcv.imnormalize(results[key][idx],
+                                                     self.mean, self.std,
                                                      self.to_rgb)
         results['img_norm_cfg'] = dict(
             mean=self.mean, std=self.std, to_rgb=self.to_rgb)
@@ -379,7 +382,9 @@ class MyPad(object):
             elif self.size_divisor is not None:
                 for idx in range(len(results[key])):
                     padded_img = mmcv.impad_to_multiple(
-                        results[key][idx], self.size_divisor, pad_val=self.pad_val)
+                        results[key][idx],
+                        self.size_divisor,
+                        pad_val=self.pad_val)
                     results[key][idx] = padded_img
         results['pad_shape'] = padded_img.shape
         results['pad_fixed_size'] = self.size
@@ -432,21 +437,25 @@ class LoadMultiViewImageFromFiles(object):
         color_type (str): Color type of the file. Defaults to 'unchanged'.
     """
 
-    def __init__(self, to_float32=False, img_scale=None, color_type='unchanged', 
-                    project_pts_to_img_depth=False, 
-                    cam_depth_range=[4.0, 45.0, 1.0],
-                    constant_std=0.5):
+    def __init__(self,
+                 to_float32=False,
+                 img_scale=None,
+                 color_type='unchanged',
+                 project_pts_to_img_depth=False,
+                 cam_depth_range=[4.0, 45.0, 1.0],
+                 constant_std=0.5):
         self.to_float32 = to_float32
         self.img_scale = img_scale
         self.color_type = color_type
         self.project_pts_to_img_depth = project_pts_to_img_depth
         self.cam_depth_range = cam_depth_range
-        self.constant_std=constant_std
+        self.constant_std = constant_std
 
     def pad(self, img):
         # to pad the 5 input images into a same size (for Waymo)
         if img.shape[0] != self.img_scale[0]:
-            img = np.concatenate([img, np.zeros_like(img[0:1280-886,:])], axis=0)
+            img = np.concatenate(
+                [img, np.zeros_like(img[0:1280 - 886, :])], axis=0)
         return img
 
     def __call__(self, results):
@@ -470,10 +479,14 @@ class LoadMultiViewImageFromFiles(object):
         filename = results['img_filename']
         if self.img_scale is None:
             img = np.stack(
-                [mmcv.imread(name, self.color_type) for name in filename], axis=-1)
+                [mmcv.imread(name, self.color_type) for name in filename],
+                axis=-1)
         else:
-            img = np.stack(
-                [self.pad(mmcv.imread(name, self.color_type)) for name in filename], axis=-1)
+            img = np.stack([
+                self.pad(mmcv.imread(name, self.color_type))
+                for name in filename
+            ],
+                           axis=-1)
         if self.to_float32:
             img = img.astype(np.float32)
         results['filename'] = filename
@@ -497,13 +510,19 @@ class LoadMultiViewImageFromFiles(object):
             for i in range(len(results['img'])):
                 # project_pts_on_img(results['points'].tensor.numpy(), results['img'][i], results['lidar2img'][i])
                 depth = map_pointcloud_to_image(
-                    results['points'].tensor.numpy(), 
-                    results['img'][i], 
-                    results['caminfo'][i]['sensor2lidar_rotation'], 
-                    results['caminfo'][i]['sensor2lidar_translation'], 
-                    results['caminfo'][i]['cam_intrinsic'], show=False)
-                guassian_depth, min_depth, std_var = generate_guassian_depth_target(torch.from_numpy(depth).unsqueeze(0), stride=8, cam_depth_range=self.cam_depth_range, constant_std=self.constant_std)
-                depth = torch.cat([min_depth[0].unsqueeze(-1), guassian_depth[0]], dim=-1)
+                    results['points'].tensor.numpy(),
+                    results['img'][i],
+                    results['caminfo'][i]['sensor2lidar_rotation'],
+                    results['caminfo'][i]['sensor2lidar_translation'],
+                    results['caminfo'][i]['cam_intrinsic'],
+                    show=False)
+                guassian_depth, min_depth, std_var = generate_guassian_depth_target(
+                    torch.from_numpy(depth).unsqueeze(0),
+                    stride=8,
+                    cam_depth_range=self.cam_depth_range,
+                    constant_std=self.constant_std)
+                depth = torch.cat(
+                    [min_depth[0].unsqueeze(-1), guassian_depth[0]], dim=-1)
                 results['img_depth'].append(depth)
         return results
 
@@ -604,7 +623,7 @@ class LoadPointsFromMultiSweeps(object):
         y_filt = np.abs(points_numpy[:, 1]) < radius
         not_close = np.logical_not(np.logical_and(x_filt, y_filt))
         return points[not_close]
-    
+
     def filter_point_by_angle(self, points):
         if isinstance(points, np.ndarray):
             points_numpy = points
@@ -613,14 +632,17 @@ class LoadPointsFromMultiSweeps(object):
         else:
             raise NotImplementedError
         # print(points_numpy[points_numpy[:,1]>0])
-        pts_phi = (np.arctan(points_numpy[:, 0] / points_numpy[:, 1]) + (points_numpy[:, 1] < 0) * np.pi + np.pi * 2) % (np.pi * 2) 
-        
-        pts_phi[pts_phi>np.pi] -= np.pi * 2
-        pts_phi = pts_phi/np.pi*180
-        
+        pts_phi = (np.arctan(points_numpy[:, 0] / points_numpy[:, 1]) +
+                   (points_numpy[:, 1] < 0) * np.pi + np.pi * 2) % (
+                       np.pi * 2)
+
+        pts_phi[pts_phi > np.pi] -= np.pi * 2
+        pts_phi = pts_phi / np.pi * 180
+
         assert np.all(-180 <= pts_phi) and np.all(pts_phi <= 180)
 
-        filt = np.logical_and(pts_phi>=self.point_cloud_angle_range[0], pts_phi<=self.point_cloud_angle_range[1])
+        filt = np.logical_and(pts_phi >= self.point_cloud_angle_range[0],
+                              pts_phi <= self.point_cloud_angle_range[1])
         # points_numpy = points_numpy[filt]
         # print(points_numpy[points_numpy[:,1]>0])
 
@@ -740,13 +762,13 @@ class LoadPointsFromMultiSweepsWaymo(LoadPointsFromMultiSweeps):
                  close_radius=1.0,
                  test_mode=False):
         super().__init__(
-                 sweeps_num=sweeps_num,
-                 load_dim=load_dim,
-                 use_dim=use_dim,
-                 file_client_args=file_client_args,
-                 pad_empty_sweeps=pad_empty_sweeps,
-                 remove_close=remove_close,
-                 test_mode=test_mode)
+            sweeps_num=sweeps_num,
+            load_dim=load_dim,
+            use_dim=use_dim,
+            file_client_args=file_client_args,
+            pad_empty_sweeps=pad_empty_sweeps,
+            remove_close=remove_close,
+            test_mode=test_mode)
         self.close_radius = close_radius
         if isinstance(self.use_dim, int):
             self.use_dim = list(range(self.use_dim))
@@ -788,11 +810,12 @@ class LoadPointsFromMultiSweepsWaymo(LoadPointsFromMultiSweeps):
         points.tensor[:, 3] = 0
         sweep_points_list = [points]
         # ts = results['timestamp']
-        ts = None # timestamp in mmdet is wrong
+        ts = None  # timestamp in mmdet is wrong
         if self.pad_empty_sweeps and len(results['sweeps']) == 0:
             for i in range(self.sweeps_num):
                 if self.remove_close:
-                    sweep_points_list.append(self._remove_close(points, self.close_radius))
+                    sweep_points_list.append(
+                        self._remove_close(points, self.close_radius))
                 else:
                     sweep_points_list.append(points)
         else:
@@ -809,11 +832,14 @@ class LoadPointsFromMultiSweepsWaymo(LoadPointsFromMultiSweeps):
             #         len(results['sweeps']), self.sweeps_num, replace=False)
             for idx in choices:
                 sweep = results['sweeps'][idx]
-                data_path = os.path.join(os.path.dirname(results['pts_filename']), os.path.basename(sweep['velodyne_path']))
+                data_path = os.path.join(
+                    os.path.dirname(results['pts_filename']),
+                    os.path.basename(sweep['velodyne_path']))
                 points_sweep = self._load_points(data_path)
                 points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
                 if self.remove_close:
-                    points_sweep = self._remove_close(points_sweep, self.close_radius)
+                    points_sweep = self._remove_close(points_sweep,
+                                                      self.close_radius)
                 # sweep_ts = sweep['timestamp'] / 1e6
                 # points_sweep[:, :3] = points_sweep[:, :3] @ sweep[
                 #     'sensor2lidar_rotation'].T
@@ -832,11 +858,15 @@ class LoadPointsFromMultiSweepsWaymo(LoadPointsFromMultiSweeps):
 
                 past_points = points_sweep[:, :3]
 
-                past_pc_in_world = np.einsum('ij,nj->ni', past2world_rot, past_points) + past2world_trans[None, :]
-                past_pc_in_curr = np.einsum('ij,nj->ni', world2curr_rot, past_pc_in_world) + world2curr_trans[None, :]
+                past_pc_in_world = np.einsum(
+                    'ij,nj->ni', past2world_rot,
+                    past_points) + past2world_trans[None, :]
+                past_pc_in_curr = np.einsum(
+                    'ij,nj->ni', world2curr_rot,
+                    past_pc_in_world) + world2curr_trans[None, :]
 
                 points_sweep[:, :3] = past_pc_in_curr
-                points_sweep[:, 3] = -1 * float(idx+1)
+                points_sweep[:, 3] = -1 * float(idx + 1)
                 points_sweep = points_sweep[:, self.use_dim]
 
                 points_sweep = points.new_point(points_sweep)
@@ -853,7 +883,8 @@ class LoadPointsFromMultiSweepsWaymo(LoadPointsFromMultiSweeps):
     def __repr__(self):
         """str: Return a string that describes the module."""
         return f'{self.__class__.__name__}(sweeps_num={self.sweeps_num})'
-        
+
+
 @PIPELINES.register_module()
 class PointSegClassMapping(object):
     """Map original semantic class to valid category ids.

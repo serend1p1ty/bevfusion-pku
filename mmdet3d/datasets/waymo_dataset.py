@@ -126,15 +126,22 @@ class WaymoDataset(KittiDataset):
             lidar2img_rts = []
 
             # load calibration for all 5 images.
-            calib_path = img_filename.replace('image_0', 'calib').replace('.png', '.txt')
+            calib_path = img_filename.replace('image_0',
+                                              'calib').replace('.png', '.txt')
             Tr_velo_to_cam_list = []
             with open(calib_path, 'r') as f:
                 lines = f.readlines()
             for line_num in range(6, 6 + self.num_views):
-                trans = np.array([float(info) for info in lines[line_num].split(' ')[1:13]]).reshape(3, 4)
-                trans = np.concatenate([trans, np.array([[0., 0., 0., 1.]])], axis=0).astype(np.float32)
+                trans = np.array([
+                    float(info) for info in lines[line_num].split(' ')[1:13]
+                ]).reshape(3, 4)
+                trans = np.concatenate(
+                    [trans, np.array([[0., 0., 0., 1.]])],
+                    axis=0).astype(np.float32)
                 Tr_velo_to_cam_list.append(trans)
-            assert np.allclose(Tr_velo_to_cam_list[0], info['calib']['Tr_velo_to_cam'].astype(np.float32))
+            assert np.allclose(
+                Tr_velo_to_cam_list[0],
+                info['calib']['Tr_velo_to_cam'].astype(np.float32))
 
             for idx_img in range(self.num_views):
                 rect = info['calib']['R0_rect'].astype(np.float32)
@@ -143,7 +150,8 @@ class WaymoDataset(KittiDataset):
                 P0 = info['calib'][f'P{idx_img}'].astype(np.float32)
                 lidar2img = P0 @ rect @ Trv2c
 
-                image_paths.append(img_filename.replace('image_0', f'image_{idx_img}'))
+                image_paths.append(
+                    img_filename.replace('image_0', f'image_{idx_img}'))
                 lidar2img_rts.append(lidar2img)
 
         pts_filename = self._get_pts_filename(sample_idx)
@@ -610,20 +618,21 @@ class MultiSweepsWaymoDataset(WaymoDataset):
 
     CLASSES = ('Car', 'Cyclist', 'Pedestrian')
 
-    def __init__(self,
-                 data_root,
-                 ann_file,
-                 split,
-                 pts_prefix='velodyne',
-                 pipeline=None,
-                 classes=None,
-                 modality=None,
-                 box_type_3d='LiDAR',
-                 filter_empty_gt=True,
-                 test_mode=False,
-                 load_interval=1,
-                 pcd_limit_range=[-85, -85, -5, 85, 85, 5],
-                 ):
+    def __init__(
+        self,
+        data_root,
+        ann_file,
+        split,
+        pts_prefix='velodyne',
+        pipeline=None,
+        classes=None,
+        modality=None,
+        box_type_3d='LiDAR',
+        filter_empty_gt=True,
+        test_mode=False,
+        load_interval=1,
+        pcd_limit_range=[-85, -85, -5, 85, 85, 5],
+    ):
         super().__init__(
             data_root=data_root,
             ann_file=ann_file,
@@ -637,7 +646,7 @@ class MultiSweepsWaymoDataset(WaymoDataset):
             test_mode=test_mode,
             load_interval=load_interval,
             pcd_limit_range=pcd_limit_range,
-            )
+        )
 
     def get_data_info(self, index):
         """Get data info according to the given index.
@@ -675,7 +684,7 @@ class MultiSweepsWaymoDataset(WaymoDataset):
             sweeps=info['sweeps'],
             timestamp=info['timestamp'],
             pose=info['pose'],
-            )
+        )
 
         if not self.test_mode:
             annos = self.get_ann_info(index)

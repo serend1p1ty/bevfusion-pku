@@ -5,4 +5,5 @@ _base_ = [
 ]
 data = dict(
     samples_per_gpu=1,
-    workers_per_gpu=6,)
+    workers_per_gpu=6,
+)

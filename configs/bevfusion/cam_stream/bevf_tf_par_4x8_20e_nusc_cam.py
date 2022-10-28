@@ -1,6 +1,5 @@
 _base_ = [
     '../../_base_/datasets/nusc_cam_tf.py',
-
 ]
 point_cloud_range = [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]
 class_names = [
@@ -8,16 +7,23 @@ class_names = [
     'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
 ]
 
-optimizer = dict(type='AdamW', lr=0.0001, betas=(0.9, 0.999), weight_decay=0.05,
-                 paramwise_cfg=dict(custom_keys={'absolute_pos_embed': dict(decay_mult=0.),
-                                                 'relative_position_bias_table': dict(decay_mult=0.),
-                                                 'norm': dict(decay_mult=0.)}))
+optimizer = dict(
+    type='AdamW',
+    lr=0.0001,
+    betas=(0.9, 0.999),
+    weight_decay=0.05,
+    paramwise_cfg=dict(
+        custom_keys={
+            'absolute_pos_embed': dict(decay_mult=0.),
+            'relative_position_bias_table': dict(decay_mult=0.),
+            'norm': dict(decay_mult=0.)
+        }))
 optimizer_config = dict(grad_clip=dict(max_norm=0.1, norm_type=2))
 
 voxel_size = [0.075, 0.075, 0.2]
 out_size_factor = 8
-final_dim=(900, 1600) # HxW
-downsample=8
+final_dim = (900, 1600)  # HxW
+downsample = 8
 dataset_type = 'NuScenesDataset'
 data_root = 'data/nuscenes/'
 input_modality = dict(
@@ -37,23 +43,23 @@ model = dict(
     downsample=downsample,
     imc=imc,
     lic=256 * 2,
-    pc_range = point_cloud_range,
+    pc_range=point_cloud_range,
     img_backbone=dict(
         type='CBSwinTransformer',
-                embed_dim=96,
-                depths=[2, 2, 6, 2],
-                num_heads=[3, 6, 12, 24],
-                window_size=7,
-                mlp_ratio=4.,
-                qkv_bias=True,
-                qk_scale=None,
-                drop_rate=0.,
-                attn_drop_rate=0.,
-                drop_path_rate=0.2,
-                ape=False,
-                patch_norm=True,
-                out_indices=(0, 1, 2, 3),
-                use_checkpoint=False),
+        embed_dim=96,
+        depths=[2, 2, 6, 2],
+        num_heads=[3, 6, 12, 24],
+        window_size=7,
+        mlp_ratio=4.,
+        qkv_bias=True,
+        qk_scale=None,
+        drop_rate=0.,
+        attn_drop_rate=0.,
+        drop_path_rate=0.2,
+        ape=False,
+        patch_norm=True,
+        out_indices=(0, 1, 2, 3),
+        use_checkpoint=False),
     img_neck=dict(
         type='FPNC',
         final_dim=final_dim,
@@ -83,7 +89,8 @@ model = dict(
         dropout=0.1,
         bn_momentum=0.1,
         activation='relu',
-        common_heads=dict(center=(2, 2), height=(1, 2), dim=(3, 2), rot=(2, 2), vel=(2, 2)),
+        common_heads=dict(
+            center=(2, 2), height=(1, 2), dim=(3, 2), rot=(2, 2), vel=(2, 2)),
         bbox_coder=dict(
             type='TransFusionBBoxCoder',
             pc_range=point_cloud_range[:2],
@@ -93,9 +100,16 @@ model = dict(
             score_threshold=0.0,
             code_size=10,
         ),
-        loss_cls=dict(type='FocalLoss', use_sigmoid=True, gamma=2, alpha=0.25, reduction='mean', loss_weight=1.0),
+        loss_cls=dict(
+            type='FocalLoss',
+            use_sigmoid=True,
+            gamma=2,
+            alpha=0.25,
+            reduction='mean',
+            loss_weight=1.0),
         loss_bbox=dict(type='L1Loss', reduction='mean', loss_weight=0.25),
-        loss_heatmap=dict(type='GaussianFocalLoss', reduction='mean', loss_weight=1.0),
+        loss_heatmap=dict(
+            type='GaussianFocalLoss', reduction='mean', loss_weight=1.0),
     ),
     train_cfg=dict(
         pts=dict(
@@ -103,10 +117,10 @@ model = dict(
             assigner=dict(
                 type='HungarianAssigner3D',
                 iou_calculator=dict(type='BboxOverlaps3D', coordinate='lidar'),
-                cls_cost=dict(type='FocalLossCost', gamma=2, alpha=0.25, weight=0.15),
+                cls_cost=dict(
+                    type='FocalLossCost', gamma=2, alpha=0.25, weight=0.15),
                 reg_cost=dict(type='BBoxBEVL1Cost', weight=0.25),
-                iou_cost=dict(type='IoU3DCost', weight=0.25)
-            ),
+                iou_cost=dict(type='IoU3DCost', weight=0.25)),
             pos_weight=-1,
             gaussian_overlap=0.1,
             min_radius=2,
@@ -151,5 +165,6 @@ workflow = [('train', 1)]
 gpu_ids = range(0, 8)
 data = dict(
     samples_per_gpu=4,
-    workers_per_gpu=6,)
+    workers_per_gpu=6,
+)
 model_parallelism = True

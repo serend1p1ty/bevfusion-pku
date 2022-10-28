@@ -19,7 +19,8 @@ file_client_args = dict(backend='disk')
 img_scale = (800, 448)
 point_cloud_range = [-54, -54, -5.0, 54, 54, 3.0]
 num_views = 6
-img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+img_norm_cfg = dict(
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 class_names = [
     'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
     'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
@@ -56,7 +57,4 @@ test_pipeline = [
         ])
 ]
 
-data = dict(
-    test=dict(pipeline=test_pipeline))
-
-
+data = dict(test=dict(pipeline=test_pipeline))

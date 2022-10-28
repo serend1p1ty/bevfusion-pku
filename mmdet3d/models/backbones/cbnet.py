@@ -8,12 +8,13 @@ from mmdet.models.builder import BACKBONES
 from .swin_transformer import SwinTransformer
 from mmcv.runner import BaseModule
 from mmdet.models.backbones.resnet import ResNet, build_norm_layer, _BatchNorm
-
-
 '''
 For Swin Transformer
 '''
+
+
 class _SwinTransformer(SwinTransformer):
+
     def _freeze_stages(self):
         if self.frozen_stages >= 0 and hasattr(self, 'patch_embed'):
             self.patch_embed.eval()
@@ -35,12 +36,12 @@ class _SwinTransformer(SwinTransformer):
 
     def del_layers(self, del_stages):
         self.del_stages = del_stages
-        if self.del_stages>=0:
+        if self.del_stages >= 0:
             del self.patch_embed
-        
-        if self.del_stages >=1 and self.ape:
+
+        if self.del_stages >= 1 and self.ape:
             del self.absolute_pos_embed
-        
+
         for i in range(0, self.del_stages - 1):
             self.layers[i] = None
 
@@ -56,7 +57,8 @@ class _SwinTransformer(SwinTransformer):
                 # interpolate the position embedding to the corresponding size
                 absolute_pos_embed = F.interpolate(
                     self.absolute_pos_embed, size=(Wh, Ww), mode='bicubic')
-                x = (x + absolute_pos_embed).flatten(2).transpose(1, 2)  # B Wh*Ww C
+                x = (x + absolute_pos_embed).flatten(2).transpose(
+                    1, 2)  # B Wh*Ww C
             else:
                 x = x.flatten(2).transpose(1, 2)
             x = self.pos_drop(x)
@@ -68,7 +70,7 @@ class _SwinTransformer(SwinTransformer):
         for i in range(self.num_layers):
             layer = self.layers[i]
             if layer is None:
-                x_out, H, W, x, Wh, Ww = pre_tmps[i+1]
+                x_out, H, W, x, Wh, Ww = pre_tmps[i + 1]
             else:
                 if cb_feats is not None:
                     x = x + cb_feats[i]
@@ -80,7 +82,8 @@ class _SwinTransformer(SwinTransformer):
                 x_out = norm_layer(x_out)
 
                 out = x_out.view(-1, H, W,
-                                 self.num_features[i]).permute(0, 3, 1, 2).contiguous()
+                                 self.num_features[i]).permute(0, 3, 1,
+                                                               2).contiguous()
                 outs.append(out)
 
         return tuple(outs), tmps
@@ -93,7 +96,12 @@ class _SwinTransformer(SwinTransformer):
 
 @BACKBONES.register_module()
 class CBSwinTransformer(BaseModule):
-    def __init__(self, embed_dim=96, cb_zero_init=True, cb_del_stages=1, **kwargs):
+
+    def __init__(self,
+                 embed_dim=96,
+                 cb_zero_init=True,
+                 cb_del_stages=1,
+                 **kwargs):
         super(CBSwinTransformer, self).__init__()
         self.cb_zero_init = cb_zero_init
         self.cb_del_stages = cb_del_stages
@@ -106,16 +114,17 @@ class CBSwinTransformer(BaseModule):
 
         self.num_layers = self.cb_modules[0].num_layers
 
-        cb_inplanes = [embed_dim * 2 ** i for i in range(self.num_layers)]
+        cb_inplanes = [embed_dim * 2**i for i in range(self.num_layers)]
 
         self.cb_linears = nn.ModuleList()
         for i in range(self.num_layers):
             linears = nn.ModuleList()
-            if i >= self.cb_del_stages-1:
+            if i >= self.cb_del_stages - 1:
                 jrange = 4 - i
                 for j in range(jrange):
                     if cb_inplanes[i + j] != cb_inplanes[i]:
-                        layer = nn.Conv2d(cb_inplanes[i + j], cb_inplanes[i], 1)
+                        layer = nn.Conv2d(cb_inplanes[i + j], cb_inplanes[i],
+                                          1)
                     else:
                         layer = nn.Identity()
                     linears.append(layer)
@@ -137,7 +146,7 @@ class CBSwinTransformer(BaseModule):
             for ls in self.cb_linears:
                 for m in ls:
                     constant_init(m, 0)
-                        
+
         for m in self.cb_modules:
             m.init_weights(pretrained=pretrained)
 
@@ -154,14 +163,14 @@ class CBSwinTransformer(BaseModule):
         Wh, Ww = tmps[0][-2:]
         for i in range(self.num_layers):
             feed = 0
-            if i >= self.cb_del_stages-1:
+            if i >= self.cb_del_stages - 1:
                 jrange = 4 - i
                 for j in range(jrange):
                     tmp = self.cb_linears[i][j](feats[j + i])
                     tmp = self.spatial_interpolate(tmp, Wh, Ww)
                     feed += tmp
             cb_feats.append(feed)
-            Wh, Ww = tmps[i+1][-2:]
+            Wh, Ww = tmps[i + 1][-2:]
 
         return cb_feats
 
@@ -174,10 +183,10 @@ class CBSwinTransformer(BaseModule):
                 feats, tmps = module(x, cb_feats, tmps)
 
             outs.append(feats)
-            
-            if i < len(self.cb_modules)-1:
-                cb_feats = self._get_cb_feats(outs[-1], tmps)  
-        if len(outs) >1:
+
+            if i < len(self.cb_modules) - 1:
+                cb_feats = self._get_cb_feats(outs[-1], tmps)
+        if len(outs) > 1:
             outs = outs[-1]
         return tuple(outs)
 
@@ -191,4 +200,3 @@ class CBSwinTransformer(BaseModule):
             # trick: eval have effect on BatchNorm only
             if isinstance(m, _BatchNorm):
                 m.eval()
-

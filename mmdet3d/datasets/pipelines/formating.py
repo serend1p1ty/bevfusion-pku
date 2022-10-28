@@ -57,7 +57,8 @@ class DefaultFormatBundle(object):
             if isinstance(results['img_depth'], list):
                 # process multiple imgs in single frame
                 # print(len(results['img']), [im.shape for im in results['img']], 'list')
-                imgs = np.ascontiguousarray(np.stack(results['img_depth'], axis=0))
+                imgs = np.ascontiguousarray(
+                    np.stack(results['img_depth'], axis=0))
                 results['img_depth'] = DC(to_tensor(imgs), stack=True)
             else:
                 # print(results['img'].shape, 'notlist')
@@ -217,7 +218,7 @@ class DefaultFormatBundle3D(DefaultFormatBundle):
             dict: The result dict contains the data that is formatted with
                 default bundle.
         """
-        # Format 3D 
+        # Format 3D
         # print("super call", isinstance(results['img'], list), 'format')
         if 'points' in results:
             assert isinstance(results['points'], BasePoints)

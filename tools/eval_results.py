@@ -42,13 +42,11 @@ def main():
     eval_kwargs = cfg.get('evaluation', {}).copy()
     # hard-code way to remove EvalHook args
     for key in [
-            'interval', 'tmpdir', 'start', 'gpu_collect', 'save_best',
-            'rule'
+            'interval', 'tmpdir', 'start', 'gpu_collect', 'save_best', 'rule'
     ]:
         eval_kwargs.pop(key, None)
     eval_kwargs.update(dict(metric=args.eval, **kwargs))
     print(dataset.evaluate(results, **eval_kwargs))
-
 
 
 if __name__ == '__main__':

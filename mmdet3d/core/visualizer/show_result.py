@@ -3,7 +3,6 @@ import numpy as np
 import trimesh
 from os import path as osp
 
-
 from .image_vis import (draw_camera_bbox3d_on_img, draw_depth_bbox3d_on_img,
                         draw_lidar_bbox3d_on_img)
 
@@ -27,6 +26,7 @@ def _write_obj(points, out_filename):
             fout.write('v %f %f %f\n' %
                        (points[i, 0], points[i, 1], points[i, 2]))
     fout.close()
+
 
 def _write_ply(points, out_filename):
     """Write points into ``ply`` format for meshlab visualization.

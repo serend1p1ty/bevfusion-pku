@@ -160,17 +160,19 @@ class TransFusionDetector(MVXTwoStageDetector):
         losses = dict()
         if pts_feats:
             if "MODEL_PARALLELISM" in os.environ:
+
                 def to_device2(datas):
                     device2 = int(os.environ['DEVICE_ID2'])
                     if datas:
                         for i, _ in enumerate(datas):
                             datas[i] = datas[i].cuda(device2)
+
                 to_device2(pts_feats)
                 to_device2(img_feats)
                 to_device2(gt_labels_3d)
-            losses_pts = self.forward_pts_train(pts_feats, img_feats, gt_bboxes_3d,
-                                                gt_labels_3d, img_metas,
-                                                gt_bboxes_ignore)
+            losses_pts = self.forward_pts_train(pts_feats, img_feats,
+                                                gt_bboxes_3d, gt_labels_3d,
+                                                img_metas, gt_bboxes_ignore)
             losses.update(losses_pts)
         if img_feats:
             losses_img = self.forward_img_train(
@@ -208,7 +210,8 @@ class TransFusionDetector(MVXTwoStageDetector):
         # print(len(img_feats), 'pts_bbox_head')
         # for i in range(len(img_feats)):
         #     print(img_feats[i].shape)
-        outs = self.pts_bbox_head(pts_feats, img_feats, img_metas, gt_bboxes_3d)
+        outs = self.pts_bbox_head(pts_feats, img_feats, img_metas,
+                                  gt_bboxes_3d)
         # outs = self.pts_bbox_head(pts_feats, img_feats, img_metas)
         loss_inputs = [gt_bboxes_3d, gt_labels_3d, outs]
         losses = self.pts_bbox_head.loss(*loss_inputs)

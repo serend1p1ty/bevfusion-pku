@@ -24,7 +24,6 @@ class AllReduce(Function):
         return grad_output
 
 
-
 @NORM_LAYERS.register_module('naiveSyncBN1d')
 class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
     """Syncronized Batch Normalization for 3D Tensors.
@@ -55,7 +54,8 @@ class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
     def forward(self, input):
         assert input.dtype == torch.float32, \
             f'input should be in float32 type, got {input.dtype}'
-        if not dist.is_initialized() or dist.get_world_size() == 1 or not self.training:
+        if not dist.is_initialized() or dist.get_world_size(
+        ) == 1 or not self.training:
             return super().forward(input)
         assert input.shape[0] > 0, 'SyncBN does not support empty inputs'
         dim_2 = input.dim() == 2
@@ -116,7 +116,8 @@ class NaiveSyncBatchNorm2d(nn.BatchNorm2d):
     def forward(self, input):
         assert input.dtype == torch.float32, \
             f'input should be in float32 type, got {input.dtype}'
-        if not dist.is_initialized() or dist.get_world_size() == 1 or not self.training:
+        if not dist.is_initialized() or dist.get_world_size(
+        ) == 1 or not self.training:
             return super().forward(input)
         # if dist.get_world_size() == 1 or not self.training:
         #     return super().forward(input)
@@ -141,6 +142,7 @@ class NaiveSyncBatchNorm2d(nn.BatchNorm2d):
         scale = scale.reshape(1, -1, 1, 1)
         bias = bias.reshape(1, -1, 1, 1)
         return input * scale + bias
+
 
 @NORM_LAYERS.register_module('naiveSyncBN3d')
 class NaiveSyncBatchNorm3d(nn.BatchNorm3d):
@@ -172,7 +174,8 @@ class NaiveSyncBatchNorm3d(nn.BatchNorm3d):
     def forward(self, input):
         assert input.dtype == torch.float32, \
             f'input should be in float32 type, got {input.dtype}'
-        if not dist.is_initialized() or dist.get_world_size() == 1 or not self.training:
+        if not dist.is_initialized() or dist.get_world_size(
+        ) == 1 or not self.training:
             return super().forward(input)
         # if dist.get_world_size() == 1 or not self.training:
         #     return super().forward(input)

@@ -1,6 +1,7 @@
 from mmcv.runner import HOOKS, Hook
 from mmcv.runner import get_dist_info
 
+
 @HOOKS.register_module()
 class AutoDriveHook(Hook):
 
@@ -26,7 +27,7 @@ class AutoDriveHook(Hook):
         loss = runner.outputs['loss']
         epoch = runner.epoch + 1
         checkpoint_name = 'epoch_{}.pth'.format(epoch)
-        r ={
+        r = {
             'step': epoch,
             'weights': checkpoint_name,
             'lr': cur_lr,
@@ -35,7 +36,8 @@ class AutoDriveHook(Hook):
         rank, _ = get_dist_info()
         if rank == 0:
             with open("/result/iterations", "a") as result_file:
-                result_file.write("{}\n".format(";".join(["{}:{}".format(k, v) for k, v in r.items()])))
+                result_file.write("{}\n".format(";".join(
+                    ["{}:{}".format(k, v) for k, v in r.items()])))
 
     def before_iter(self, runner):
         pass

@@ -10,6 +10,7 @@ from ..registry import OBJECTSAMPLERS
 from .data_augment_utils import noise_per_object_v3_
 import json
 
+
 @PIPELINES.register_module()
 class RandomFlip3D(RandomFlip):
     """Flip the points & bbox.
@@ -118,7 +119,7 @@ class RandomFlip3D(RandomFlip):
             self.random_flip_data_3d(input_dict, 'vertical')
             input_dict['transformation_3d_flow'].extend(['VF'])
         # print('after randomflip3d call', isinstance(input_dict['img'], list))
-        
+
         return input_dict
 
     def __repr__(self):
@@ -554,7 +555,7 @@ class PointsRangeFilter(object):
         clean_points = points[points_mask]
         input_dict['points'] = clean_points
         # print('after PointsRangeFilter call', isinstance(input_dict['img'], list))
-        
+
         return input_dict
 
     def __repr__(self):
@@ -887,10 +888,12 @@ class VoxelBasedPointSampler(object):
 
 @PIPELINES.register_module()
 class Randomdropforeground(object):
-    def __init__(self,
-                 drop_rate=0.5,
-                 ):
-        self.drop_rate=drop_rate
+
+    def __init__(
+        self,
+        drop_rate=0.5,
+    ):
+        self.drop_rate = drop_rate
         print('drop foreground points, ', self.drop_rate)
 
     @staticmethod
@@ -907,20 +910,21 @@ class Randomdropforeground(object):
         masks = box_np_ops.points_in_rbbox(points.coord.numpy(), boxes)
         points = points[np.logical_not(masks.any(-1))]
         return points
-    
+
     def __call__(self, input_dict):
         gt_bboxes_3d = input_dict['gt_bboxes_3d']
         gt_labels_3d = input_dict['gt_labels_3d']
         # change to float for blending operation
         points = input_dict['points']
         drop_foreground = False
-        if np.random.rand() <self.drop_rate:
-            points = self.remove_points_in_boxes(points, gt_bboxes_3d.tensor.numpy())
+        if np.random.rand() < self.drop_rate:
+            points = self.remove_points_in_boxes(points,
+                                                 gt_bboxes_3d.tensor.numpy())
             drop_foreground = True
         input_dict['points'] = points
         # pts_filename = input_dict['pts_filename']   # save drop infos
         # with open("drop_foreground.txt","a+") as f:
-        #     f.write(f'{pts_filename} {drop_foreground}\n') 
+        #     f.write(f'{pts_filename} {drop_foreground}\n')
         return input_dict
 
     def __repr__(self):

@@ -101,27 +101,28 @@ class NuScenesDataset(Custom3DDataset):
                'bicycle', 'motorcycle', 'pedestrian', 'traffic_cone',
                'barrier')
 
-    def __init__(self,
-                 ann_file,
-                 num_views=6,
-                 pipeline=None,
-                 data_root=None,
-                 classes=None,
-                 load_interval=1,
-                 with_velocity=True,
-                 modality=None,
-                 box_type_3d='LiDAR',
-                 filter_empty_gt=True,
-                 test_mode=False,
-                 test_gt=False,
-                 eval_version='detection_cvpr_2019',
-                 use_valid_flag=False,
-                 # Add
-                 extrinsics_noise=False,
-                 extrinsics_noise_type='single',
-                 drop_frames=False,
-                 drop_set=[0,'discrete'],
-                 noise_sensor_type='camera'):
+    def __init__(
+            self,
+            ann_file,
+            num_views=6,
+            pipeline=None,
+            data_root=None,
+            classes=None,
+            load_interval=1,
+            with_velocity=True,
+            modality=None,
+            box_type_3d='LiDAR',
+            filter_empty_gt=True,
+            test_mode=False,
+            test_gt=False,
+            eval_version='detection_cvpr_2019',
+            use_valid_flag=False,
+            # Add
+            extrinsics_noise=False,
+            extrinsics_noise_type='single',
+            drop_frames=False,
+            drop_set=[0, 'discrete'],
+            noise_sensor_type='camera'):
         self.load_interval = load_interval
         self.use_valid_flag = use_valid_flag
         super().__init__(
@@ -152,28 +153,31 @@ class NuScenesDataset(Custom3DDataset):
         ### for frop foreground points
         self.test_gt = test_gt
         ## 增加部分
-        self.extrinsics_noise = extrinsics_noise # 外参是否扰动
-        assert extrinsics_noise_type in ['all', 'single'] 
-        self.extrinsics_noise_type = extrinsics_noise_type # 外参扰动类型
-        self.drop_frames = drop_frames # 是否丢帧
-        self.drop_ratio = drop_set[0] # 丢帧比例：assert ratio in [10, 20, ..., 90]
-        self.drop_type = drop_set[1] # 丢帧情况：连续(consecutive) or 离散(discrete)
-        self.noise_sensor_type = noise_sensor_type # lidar or camera 丢帧
+        self.extrinsics_noise = extrinsics_noise  # 外参是否扰动
+        assert extrinsics_noise_type in ['all', 'single']
+        self.extrinsics_noise_type = extrinsics_noise_type  # 外参扰动类型
+        self.drop_frames = drop_frames  # 是否丢帧
+        self.drop_ratio = drop_set[0]  # 丢帧比例：assert ratio in [10, 20, ..., 90]
+        self.drop_type = drop_set[1]  # 丢帧情况：连续(consecutive) or 离散(discrete)
+        self.noise_sensor_type = noise_sensor_type  # lidar or camera 丢帧
 
         if self.extrinsics_noise or self.drop_frames:
-            pkl_file = open('./data/nuscenes/nuscenes_infos_val_with_noise.pkl', 'rb')
+            pkl_file = open(
+                './data/nuscenes/nuscenes_infos_val_with_noise.pkl', 'rb')
             noise_data = pickle.load(pkl_file)
             self.noise_data = noise_data[noise_sensor_type]
         else:
             self.noise_data = None
-        
+
         print('noise setting:')
         if self.drop_frames:
-            print('frame drop setting: drop ratio:', self.drop_ratio, ', sensor type:', self.noise_sensor_type, ', drop type:', self.drop_type)
+            print('frame drop setting: drop ratio:', self.drop_ratio,
+                  ', sensor type:', self.noise_sensor_type, ', drop type:',
+                  self.drop_type)
         if self.extrinsics_noise:
-            assert noise_sensor_type=='camera'
+            assert noise_sensor_type == 'camera'
             print(f'add {extrinsics_noise_type} noise to extrinsics')
-    
+
     ### for frop foreground points
     def __getitem__(self, idx):
         """Get item from infos according to the given index.
@@ -189,6 +193,7 @@ class NuScenesDataset(Custom3DDataset):
                 idx = self._rand_another(idx)
                 continue
             return data
+
     def get_cat_ids(self, idx):
         """Get category distribution of single scene.
 
@@ -262,16 +267,25 @@ class NuScenesDataset(Custom3DDataset):
                 pts_filename = input_dict['pts_filename']
                 file_name = pts_filename.split('/')[-1]
 
-                if self.noise_data[file_name]['noise']['drop_frames'][self.drop_ratio][self.drop_type]['stuck']:
-                    replace_file = self.noise_data[file_name]['noise']['drop_frames'][self.drop_ratio][self.drop_type]['replace']
+                if self.noise_data[file_name]['noise']['drop_frames'][
+                        self.drop_ratio][self.drop_type]['stuck']:
+                    replace_file = self.noise_data[file_name]['noise'][
+                        'drop_frames'][self.drop_ratio][
+                            self.drop_type]['replace']
                     if replace_file != '':
-                        pts_filename = pts_filename.replace(file_name, replace_file)
+                        pts_filename = pts_filename.replace(
+                            file_name, replace_file)
 
                         input_dict['pts_filename'] = pts_filename
-                        input_dict['sweeps'] = self.noise_data[replace_file]['mmdet_info']['sweeps']
-                        input_dict['timestamp'] = self.noise_data[replace_file]['mmdet_info']['timestamp'] / 1e6
+                        input_dict['sweeps'] = self.noise_data[replace_file][
+                            'mmdet_info']['sweeps']
+                        input_dict['timestamp'] = self.noise_data[
+                            replace_file]['mmdet_info']['timestamp'] / 1e6
 
-        cam_orders = ['CAM_FRONT_LEFT', 'CAM_FRONT', 'CAM_FRONT_RIGHT', 'CAM_BACK_RIGHT', 'CAM_BACK', 'CAM_BACK_LEFT']
+        cam_orders = [
+            'CAM_FRONT_LEFT', 'CAM_FRONT', 'CAM_FRONT_RIGHT', 'CAM_BACK_RIGHT',
+            'CAM_BACK', 'CAM_BACK_LEFT'
+        ]
         if self.modality['use_camera']:
             image_paths = []
             lidar2img_rts = []
@@ -284,21 +298,30 @@ class NuScenesDataset(Custom3DDataset):
                 file_name = cam_data_path.split('/')[-1]
                 if self.noise_sensor_type == 'camera':
                     if self.drop_frames:
-                        if self.noise_data[file_name]['noise']['drop_frames'][self.drop_ratio][self.drop_type]['stuck']:
-                            replace_file = self.noise_data[file_name]['noise']['drop_frames'][self.drop_ratio][self.drop_type]['replace']
+                        if self.noise_data[file_name]['noise']['drop_frames'][
+                                self.drop_ratio][self.drop_type]['stuck']:
+                            replace_file = self.noise_data[file_name]['noise'][
+                                'drop_frames'][self.drop_ratio][
+                                    self.drop_type]['replace']
                             if replace_file != '':
-                                cam_data_path = cam_data_path.replace(file_name, replace_file)
+                                cam_data_path = cam_data_path.replace(
+                                    file_name, replace_file)
 
                                 # print(file_name, self.noise_data[file_name]['prev'])
 
                 image_paths.append(cam_data_path)
                 # obtain lidar to image transformation matrix
                 if self.extrinsics_noise:
-                    sensor2lidar_rotation = self.noise_data[file_name]['noise']['extrinsics_noise'][f'{self.extrinsics_noise_type}_noise_sensor2lidar_rotation']
-                    sensor2lidar_translation = self.noise_data[file_name]['noise']['extrinsics_noise'][f'{self.extrinsics_noise_type}_noise_sensor2lidar_translation']
+                    sensor2lidar_rotation = self.noise_data[file_name][
+                        'noise']['extrinsics_noise'][
+                            f'{self.extrinsics_noise_type}_noise_sensor2lidar_rotation']
+                    sensor2lidar_translation = self.noise_data[file_name][
+                        'noise']['extrinsics_noise'][
+                            f'{self.extrinsics_noise_type}_noise_sensor2lidar_translation']
                 else:
                     sensor2lidar_rotation = cam_info['sensor2lidar_rotation']
-                    sensor2lidar_translation = cam_info['sensor2lidar_translation']
+                    sensor2lidar_translation = cam_info[
+                        'sensor2lidar_translation']
 
                 lidar2cam_r = np.linalg.inv(sensor2lidar_rotation)
                 lidar2cam_t = sensor2lidar_translation @ lidar2cam_r.T
@@ -310,18 +333,17 @@ class NuScenesDataset(Custom3DDataset):
                 viewpad[:intrinsic.shape[0], :intrinsic.shape[1]] = intrinsic
                 lidar2img_rt = (viewpad @ lidar2cam_rt.T)
                 lidar2img_rts.append(lidar2img_rt)
-                caminfos.append(
-                    {'sensor2lidar_translation':sensor2lidar_translation, 
-                    'sensor2lidar_rotation':sensor2lidar_rotation,
-                    'cam_intrinsic':cam_info['cam_intrinsic']
-                    })
+                caminfos.append({
+                    'sensor2lidar_translation': sensor2lidar_translation,
+                    'sensor2lidar_rotation': sensor2lidar_rotation,
+                    'cam_intrinsic': cam_info['cam_intrinsic']
+                })
 
             input_dict.update(
                 dict(
                     img_filename=image_paths,
                     lidar2img=lidar2img_rts,
-                    caminfo=caminfos
-                ))
+                    caminfo=caminfos))
 
         if not self.test_mode:
             annos = self.get_ann_info(index)
@@ -583,7 +605,8 @@ class NuScenesDataset(Custom3DDataset):
         print(results_dict)
         if osp.exists('/evaluation_result/'):
             with open("/evaluation_result/total", "a") as result_file:
-                result_file.write("{}\n".format("\n".join(["{}:{}".format(k, v) for k, v in results_dict.items()])))
+                result_file.write("{}\n".format("\n".join(
+                    ["{}:{}".format(k, v) for k, v in results_dict.items()])))
         return results_dict
 
     def show(self, results, out_dir):

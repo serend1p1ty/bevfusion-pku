@@ -1,4 +1,6 @@
-_base_ = ['../../centerpoint/centerpoint_0075voxel_second_secfpn_4x8_cyclic_20e_nus.py']
+_base_ = [
+    '../../centerpoint/centerpoint_0075voxel_second_secfpn_4x8_cyclic_20e_nus.py'
+]
 
 model = dict(
     pts_bbox_head=dict(
@@ -14,5 +16,3 @@ model = dict(
             init_bias=-2.19,
             final_kernel=3)),
     test_cfg=dict(pts=dict(nms_type='circle')))
-
-
