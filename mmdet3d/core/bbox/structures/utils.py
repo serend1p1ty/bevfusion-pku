@@ -38,27 +38,33 @@ def rotation_3d_in_axis(points, angles, axis=0):
     ones = torch.ones_like(rot_cos)
     zeros = torch.zeros_like(rot_cos)
     if axis == 1:
-        rot_mat_T = torch.stack([
-            torch.stack([rot_cos, zeros, -rot_sin]),
-            torch.stack([zeros, ones, zeros]),
-            torch.stack([rot_sin, zeros, rot_cos])
-        ])
+        rot_mat_T = torch.stack(
+            [
+                torch.stack([rot_cos, zeros, -rot_sin]),
+                torch.stack([zeros, ones, zeros]),
+                torch.stack([rot_sin, zeros, rot_cos]),
+            ]
+        )
     elif axis == 2 or axis == -1:
-        rot_mat_T = torch.stack([
-            torch.stack([rot_cos, -rot_sin, zeros]),
-            torch.stack([rot_sin, rot_cos, zeros]),
-            torch.stack([zeros, zeros, ones])
-        ])
+        rot_mat_T = torch.stack(
+            [
+                torch.stack([rot_cos, -rot_sin, zeros]),
+                torch.stack([rot_sin, rot_cos, zeros]),
+                torch.stack([zeros, zeros, ones]),
+            ]
+        )
     elif axis == 0:
-        rot_mat_T = torch.stack([
-            torch.stack([zeros, rot_cos, -rot_sin]),
-            torch.stack([zeros, rot_sin, rot_cos]),
-            torch.stack([ones, zeros, zeros])
-        ])
+        rot_mat_T = torch.stack(
+            [
+                torch.stack([zeros, rot_cos, -rot_sin]),
+                torch.stack([zeros, rot_sin, rot_cos]),
+                torch.stack([ones, zeros, zeros]),
+            ]
+        )
     else:
-        raise ValueError(f'axis should in range [0, 1, 2], got {axis}')
+        raise ValueError(f"axis should in range [0, 1, 2], got {axis}")
 
-    return torch.einsum('aij,jka->aik', (points, rot_mat_T))
+    return torch.einsum("aij,jka->aik", (points, rot_mat_T))
 
 
 def xywhr2xyxyr(boxes_xywhr):
@@ -92,21 +98,27 @@ def get_box_type(box_type):
     Returns:
         tuple: Box type and box mode.
     """
-    from .box_3d_mode import (Box3DMode, CameraInstance3DBoxes,
-                              DepthInstance3DBoxes, LiDARInstance3DBoxes)
+    from .box_3d_mode import (
+        Box3DMode,
+        CameraInstance3DBoxes,
+        DepthInstance3DBoxes,
+        LiDARInstance3DBoxes,
+    )
+
     box_type_lower = box_type.lower()
-    if box_type_lower == 'lidar':
+    if box_type_lower == "lidar":
         box_type_3d = LiDARInstance3DBoxes
         box_mode_3d = Box3DMode.LIDAR
-    elif box_type_lower == 'camera':
+    elif box_type_lower == "camera":
         box_type_3d = CameraInstance3DBoxes
         box_mode_3d = Box3DMode.CAM
-    elif box_type_lower == 'depth':
+    elif box_type_lower == "depth":
         box_type_3d = DepthInstance3DBoxes
         box_mode_3d = Box3DMode.DEPTH
     else:
-        raise ValueError('Only "box_type" of "camera", "lidar", "depth"'
-                         f' are supported, got {box_type}')
+        raise ValueError(
+            'Only "box_type" of "camera", "lidar", "depth"' f" are supported, got {box_type}"
+        )
 
     return box_type_3d, box_mode_3d
 
@@ -124,21 +136,20 @@ def points_cam2img(points_3d, proj_mat):
     points_num = list(points_3d.shape)[:-1]
 
     points_shape = np.concatenate([points_num, [1]], axis=0).tolist()
-    assert len(proj_mat.shape) == 2, f'The dimension of the projection'\
-        f'matrix should be 2 instead of {len(proj_mat.shape)}.'
+    assert len(proj_mat.shape) == 2, (
+        f"The dimension of the projection" f"matrix should be 2 instead of {len(proj_mat.shape)}."
+    )
     d1, d2 = proj_mat.shape[:2]
-    assert (d1 == 3 and d2 == 3) or (d1 == 3 and d2 == 4) or (
-        d1 == 4 and d2 == 4), f'The shape of the projection matrix'\
-        f' ({d1}*{d2}) is not supported.'
+    assert (d1 == 3 and d2 == 3) or (d1 == 3 and d2 == 4) or (d1 == 4 and d2 == 4), (
+        f"The shape of the projection matrix" f" ({d1}*{d2}) is not supported."
+    )
     if d1 == 3:
-        proj_mat_expanded = torch.eye(
-            4, device=proj_mat.device, dtype=proj_mat.dtype)
+        proj_mat_expanded = torch.eye(4, device=proj_mat.device, dtype=proj_mat.dtype)
         proj_mat_expanded[:d1, :d2] = proj_mat
         proj_mat = proj_mat_expanded
 
     # previous implementation use new_zeros, new_one yeilds better results
-    points_4 = torch.cat(
-        [points_3d, points_3d.new_ones(*points_shape)], dim=-1)
+    points_4 = torch.cat([points_3d, points_3d.new_ones(*points_shape)], dim=-1)
     point_2d = torch.matmul(points_4, proj_mat.t())
     point_2d_res = point_2d[..., :2] / point_2d[..., 2:3]
     return point_2d_res

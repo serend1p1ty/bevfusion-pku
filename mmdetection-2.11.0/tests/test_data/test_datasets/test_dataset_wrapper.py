@@ -5,35 +5,28 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
-from mmdet.datasets import (ClassBalancedDataset, ConcatDataset, CustomDataset,
-                            RepeatDataset)
+from mmdet.datasets import ClassBalancedDataset, ConcatDataset, CustomDataset, RepeatDataset
 
 
 def test_dataset_wrapper():
     CustomDataset.load_annotations = MagicMock()
     CustomDataset.__getitem__ = MagicMock(side_effect=lambda idx: idx)
-    dataset_a = CustomDataset(
-        ann_file=MagicMock(), pipeline=[], test_mode=True, img_prefix='')
+    dataset_a = CustomDataset(ann_file=MagicMock(), pipeline=[], test_mode=True, img_prefix="")
     len_a = 10
     cat_ids_list_a = [
-        np.random.randint(0, 80, num).tolist()
-        for num in np.random.randint(1, 20, len_a)
+        np.random.randint(0, 80, num).tolist() for num in np.random.randint(1, 20, len_a)
     ]
     dataset_a.data_infos = MagicMock()
     dataset_a.data_infos.__len__.return_value = len_a
-    dataset_a.get_cat_ids = MagicMock(
-        side_effect=lambda idx: cat_ids_list_a[idx])
-    dataset_b = CustomDataset(
-        ann_file=MagicMock(), pipeline=[], test_mode=True, img_prefix='')
+    dataset_a.get_cat_ids = MagicMock(side_effect=lambda idx: cat_ids_list_a[idx])
+    dataset_b = CustomDataset(ann_file=MagicMock(), pipeline=[], test_mode=True, img_prefix="")
     len_b = 20
     cat_ids_list_b = [
-        np.random.randint(0, 80, num).tolist()
-        for num in np.random.randint(1, 20, len_b)
+        np.random.randint(0, 80, num).tolist() for num in np.random.randint(1, 20, len_b)
     ]
     dataset_b.data_infos = MagicMock()
     dataset_b.data_infos.__len__.return_value = len_b
-    dataset_b.get_cat_ids = MagicMock(
-        side_effect=lambda idx: cat_ids_list_b[idx])
+    dataset_b.get_cat_ids = MagicMock(side_effect=lambda idx: cat_ids_list_b[idx])
 
     concat_dataset = ConcatDataset([dataset_a, dataset_b])
     assert concat_dataset[5] == 5
@@ -76,5 +69,4 @@ def test_dataset_wrapper():
     repeat_factor_dataset = ClassBalancedDataset(dataset_a, repeat_thr)
     assert len(repeat_factor_dataset) == repeat_factors_cumsum[-1]
     for idx in np.random.randint(0, len(repeat_factor_dataset), 3):
-        assert repeat_factor_dataset[idx] == bisect.bisect_right(
-            repeat_factors_cumsum, idx)
+        assert repeat_factor_dataset[idx] == bisect.bisect_right(repeat_factors_cumsum, idx)

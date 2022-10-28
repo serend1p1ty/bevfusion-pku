@@ -11,14 +11,9 @@ class PointRend(TwoStageDetector):
 
     """
 
-    def __init__(self,
-                 backbone,
-                 rpn_head,
-                 roi_head,
-                 train_cfg,
-                 test_cfg,
-                 neck=None,
-                 pretrained=None):
+    def __init__(
+        self, backbone, rpn_head, roi_head, train_cfg, test_cfg, neck=None, pretrained=None
+    ):
         super(PointRend, self).__init__(
             backbone=backbone,
             neck=neck,
@@ -26,4 +21,5 @@ class PointRend(TwoStageDetector):
             roi_head=roi_head,
             train_cfg=train_cfg,
             test_cfg=test_cfg,
-            pretrained=pretrained)
+            pretrained=pretrained,
+        )

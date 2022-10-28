@@ -36,17 +36,19 @@ class PillarFeatureNet(nn.Module):
             the original behavior. Defaults to True.
     """
 
-    def __init__(self,
-                 in_channels=4,
-                 feat_channels=(64, ),
-                 with_distance=False,
-                 with_cluster_center=True,
-                 with_voxel_center=True,
-                 voxel_size=(0.2, 0.2, 4),
-                 point_cloud_range=(0, -40, -3, 70.4, 40, 1),
-                 norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
-                 mode='max',
-                 legacy=True):
+    def __init__(
+        self,
+        in_channels=4,
+        feat_channels=(64,),
+        with_distance=False,
+        with_cluster_center=True,
+        with_voxel_center=True,
+        voxel_size=(0.2, 0.2, 4),
+        point_cloud_range=(0, -40, -3, 70.4, 40, 1),
+        norm_cfg=dict(type="BN1d", eps=1e-3, momentum=0.01),
+        mode="max",
+        legacy=True,
+    ):
         super(PillarFeatureNet, self).__init__()
         assert len(feat_channels) > 0
         self.legacy = legacy
@@ -73,11 +75,9 @@ class PillarFeatureNet(nn.Module):
                 last_layer = True
             pfn_layers.append(
                 PFNLayer(
-                    in_filters,
-                    out_filters,
-                    norm_cfg=norm_cfg,
-                    last_layer=last_layer,
-                    mode=mode))
+                    in_filters, out_filters, norm_cfg=norm_cfg, last_layer=last_layer, mode=mode
+                )
+            )
         self.pfn_layers = nn.ModuleList(pfn_layers)
 
         # Need pillar (voxel) size and x/y offset in order to calculate offset
@@ -103,9 +103,9 @@ class PillarFeatureNet(nn.Module):
         features_ls = [features]
         # Find distance of x, y, and z from cluster center
         if self._with_cluster_center:
-            points_mean = features[:, :, :3].sum(
-                dim=1, keepdim=True) / num_points.type_as(features).view(
-                    -1, 1, 1)
+            points_mean = features[:, :, :3].sum(dim=1, keepdim=True) / num_points.type_as(
+                features
+            ).view(-1, 1, 1)
             f_cluster = features[:, :, :3] - points_mean
             features_ls.append(f_cluster)
 
@@ -115,19 +115,19 @@ class PillarFeatureNet(nn.Module):
             if not self.legacy:
                 f_center = torch.zeros_like(features[:, :, :2])
                 f_center[:, :, 0] = features[:, :, 0] - (
-                    coors[:, 3].to(dtype).unsqueeze(1) * self.vx +
-                    self.x_offset)
+                    coors[:, 3].to(dtype).unsqueeze(1) * self.vx + self.x_offset
+                )
                 f_center[:, :, 1] = features[:, :, 1] - (
-                    coors[:, 2].to(dtype).unsqueeze(1) * self.vy +
-                    self.y_offset)
+                    coors[:, 2].to(dtype).unsqueeze(1) * self.vy + self.y_offset
+                )
             else:
                 f_center = features[:, :, :2]
                 f_center[:, :, 0] = f_center[:, :, 0] - (
-                    coors[:, 3].type_as(features).unsqueeze(1) * self.vx +
-                    self.x_offset)
+                    coors[:, 3].type_as(features).unsqueeze(1) * self.vx + self.x_offset
+                )
                 f_center[:, :, 1] = f_center[:, :, 1] - (
-                    coors[:, 2].type_as(features).unsqueeze(1) * self.vy +
-                    self.y_offset)
+                    coors[:, 2].type_as(features).unsqueeze(1) * self.vy + self.y_offset
+                )
             features_ls.append(f_center)
 
         if self._with_distance:
@@ -178,16 +178,18 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
             'max' or 'avg'. Defaults to 'max'.
     """
 
-    def __init__(self,
-                 in_channels=4,
-                 feat_channels=(64, ),
-                 with_distance=False,
-                 with_cluster_center=True,
-                 with_voxel_center=True,
-                 voxel_size=(0.2, 0.2, 4),
-                 point_cloud_range=(0, -40, -3, 70.4, 40, 1),
-                 norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
-                 mode='max'):
+    def __init__(
+        self,
+        in_channels=4,
+        feat_channels=(64,),
+        with_distance=False,
+        with_cluster_center=True,
+        with_voxel_center=True,
+        voxel_size=(0.2, 0.2, 4),
+        point_cloud_range=(0, -40, -3, 70.4, 40, 1),
+        norm_cfg=dict(type="BN1d", eps=1e-3, momentum=0.01),
+        mode="max",
+    ):
         super(DynamicPillarFeatureNet, self).__init__(
             in_channels,
             feat_channels,
@@ -197,7 +199,8 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
             voxel_size=voxel_size,
             point_cloud_range=point_cloud_range,
             norm_cfg=norm_cfg,
-            mode=mode)
+            mode=mode,
+        )
         self.fp16_enabled = False
         feat_channels = [self.in_channels] + list(feat_channels)
         pfn_layers = []
@@ -211,14 +214,15 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
             norm_name, norm_layer = build_norm_layer(norm_cfg, out_filters)
             pfn_layers.append(
                 nn.Sequential(
-                    nn.Linear(in_filters, out_filters, bias=False), norm_layer,
-                    nn.ReLU(inplace=True)))
+                    nn.Linear(in_filters, out_filters, bias=False),
+                    norm_layer,
+                    nn.ReLU(inplace=True),
+                )
+            )
         self.num_pfn = len(pfn_layers)
         self.pfn_layers = nn.ModuleList(pfn_layers)
-        self.pfn_scatter = DynamicScatter(voxel_size, point_cloud_range,
-                                          (mode != 'max'))
-        self.cluster_scatter = DynamicScatter(
-            voxel_size, point_cloud_range, average_points=True)
+        self.pfn_scatter = DynamicScatter(voxel_size, point_cloud_range, (mode != "max"))
+        self.cluster_scatter = DynamicScatter(voxel_size, point_cloud_range, average_points=True)
 
     def map_voxel_center_to_point(self, pts_coors, voxel_mean, voxel_coors):
         """Map the centers of voxels to its corresponding points.
@@ -236,10 +240,8 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
         """
         # Step 1: scatter voxel into canvas
         # Calculate necessary things for canvas creation
-        canvas_y = int(
-            (self.point_cloud_range[4] - self.point_cloud_range[1]) / self.vy)
-        canvas_x = int(
-            (self.point_cloud_range[3] - self.point_cloud_range[0]) / self.vx)
+        canvas_y = int((self.point_cloud_range[4] - self.point_cloud_range[1]) / self.vy)
+        canvas_x = int((self.point_cloud_range[3] - self.point_cloud_range[0]) / self.vx)
         canvas_channel = voxel_mean.size(1)
         batch_size = pts_coors[-1, 0] + 1
         canvas_len = canvas_y * canvas_x * batch_size
@@ -247,15 +249,17 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
         canvas = voxel_mean.new_zeros(canvas_channel, canvas_len)
         # Only include non-empty pillars
         indices = (
-            voxel_coors[:, 0] * canvas_y * canvas_x +
-            voxel_coors[:, 2] * canvas_x + voxel_coors[:, 3])
+            voxel_coors[:, 0] * canvas_y * canvas_x
+            + voxel_coors[:, 2] * canvas_x
+            + voxel_coors[:, 3]
+        )
         # Scatter the blob back to the canvas
         canvas[:, indices.long()] = voxel_mean.t()
 
         # Step 2: get voxel mean for each point
         voxel_index = (
-            pts_coors[:, 0] * canvas_y * canvas_x +
-            pts_coors[:, 2] * canvas_x + pts_coors[:, 3])
+            pts_coors[:, 0] * canvas_y * canvas_x + pts_coors[:, 2] * canvas_x + pts_coors[:, 3]
+        )
         center_per_point = canvas[:, voxel_index.long()].t()
         return center_per_point
 
@@ -275,8 +279,7 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
         # Find distance of x, y, and z from cluster center
         if self._with_cluster_center:
             voxel_mean, mean_coors = self.cluster_scatter(features, coors)
-            points_mean = self.map_voxel_center_to_point(
-                coors, voxel_mean, mean_coors)
+            points_mean = self.map_voxel_center_to_point(coors, voxel_mean, mean_coors)
             # TODO: maybe also do cluster for reflectivity
             f_cluster = features[:, :3] - points_mean[:, :3]
             features_ls.append(f_cluster)
@@ -285,9 +288,11 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
         if self._with_voxel_center:
             f_center = features.new_zeros(size=(features.size(0), 2))
             f_center[:, 0] = features[:, 0] - (
-                coors[:, 3].type_as(features) * self.vx + self.x_offset)
+                coors[:, 3].type_as(features) * self.vx + self.x_offset
+            )
             f_center[:, 1] = features[:, 1] - (
-                coors[:, 2].type_as(features) * self.vy + self.y_offset)
+                coors[:, 2].type_as(features) * self.vy + self.y_offset
+            )
             features_ls.append(f_center)
 
         if self._with_distance:
@@ -301,8 +306,7 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
             voxel_feats, voxel_coors = self.pfn_scatter(point_feats, coors)
             if i != len(self.pfn_layers) - 1:
                 # need to concat voxel feats if it is not the last pfn
-                feat_per_point = self.map_voxel_center_to_point(
-                    coors, voxel_feats, voxel_coors)
+                feat_per_point = self.map_voxel_center_to_point(coors, voxel_feats, voxel_coors)
                 features = torch.cat([point_feats, feat_per_point], dim=1)
 
         return voxel_feats, voxel_coors

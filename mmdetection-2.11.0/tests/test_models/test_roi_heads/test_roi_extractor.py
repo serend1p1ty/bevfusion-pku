@@ -7,11 +7,11 @@ from mmdet.models.roi_heads.roi_extractors import GenericRoIExtractor
 def test_groie():
     # test with pre/post
     cfg = dict(
-        roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=2),
+        roi_layer=dict(type="RoIAlign", output_size=7, sampling_ratio=2),
         out_channels=256,
         featmap_strides=[4, 8, 16, 32],
         pre_cfg=dict(
-            type='ConvModule',
+            type="ConvModule",
             in_channels=256,
             out_channels=256,
             kernel_size=5,
@@ -19,12 +19,14 @@ def test_groie():
             inplace=False,
         ),
         post_cfg=dict(
-            type='ConvModule',
+            type="ConvModule",
             in_channels=256,
             out_channels=256,
             kernel_size=5,
             padding=2,
-            inplace=False))
+            inplace=False,
+        ),
+    )
 
     groie = GenericRoIExtractor(**cfg)
 
@@ -42,9 +44,10 @@ def test_groie():
 
     # test w.o. pre/post
     cfg = dict(
-        roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=2),
+        roi_layer=dict(type="RoIAlign", output_size=7, sampling_ratio=2),
         out_channels=256,
-        featmap_strides=[4, 8, 16, 32])
+        featmap_strides=[4, 8, 16, 32],
+    )
 
     groie = GenericRoIExtractor(**cfg)
 
@@ -62,10 +65,11 @@ def test_groie():
 
     # test w.o. pre/post concat
     cfg = dict(
-        aggregation='concat',
-        roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=2),
+        aggregation="concat",
+        roi_layer=dict(type="RoIAlign", output_size=7, sampling_ratio=2),
         out_channels=256 * 4,
-        featmap_strides=[4, 8, 16, 32])
+        featmap_strides=[4, 8, 16, 32],
+    )
 
     groie = GenericRoIExtractor(**cfg)
 
@@ -84,18 +88,20 @@ def test_groie():
     # test not supported aggregate method
     with pytest.raises(AssertionError):
         cfg = dict(
-            aggregation='not support',
-            roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=2),
+            aggregation="not support",
+            roi_layer=dict(type="RoIAlign", output_size=7, sampling_ratio=2),
             out_channels=1024,
-            featmap_strides=[4, 8, 16, 32])
+            featmap_strides=[4, 8, 16, 32],
+        )
         _ = GenericRoIExtractor(**cfg)
 
     # test concat channels number
     cfg = dict(
-        aggregation='concat',
-        roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=2),
+        aggregation="concat",
+        roi_layer=dict(type="RoIAlign", output_size=7, sampling_ratio=2),
         out_channels=256 * 5,  # 256*5 != 256*4
-        featmap_strides=[4, 8, 16, 32])
+        featmap_strides=[4, 8, 16, 32],
+    )
 
     groie = GenericRoIExtractor(**cfg)
 

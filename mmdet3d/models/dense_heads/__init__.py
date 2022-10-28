@@ -9,7 +9,13 @@ from .vote_head import VoteHead
 from .transfusion_head import TransFusionHead
 
 __all__ = [
-    'Anchor3DHead', 'FreeAnchor3DHead', 'PartA2RPNHead', 'VoteHead',
-    'SSD3DHead', 'BaseConvBboxHead', 'CenterHead', 'ShapeAwareHead',
-    'TransFusionHead',
+    "Anchor3DHead",
+    "FreeAnchor3DHead",
+    "PartA2RPNHead",
+    "VoteHead",
+    "SSD3DHead",
+    "BaseConvBboxHead",
+    "CenterHead",
+    "ShapeAwareHead",
+    "TransFusionHead",
 ]

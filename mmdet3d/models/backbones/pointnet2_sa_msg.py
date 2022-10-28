@@ -37,32 +37,36 @@ class PointNet2SAMSG(BasePointNet):
               each SA module.
     """
 
-    def __init__(self,
-                 in_channels,
-                 num_points=(2048, 1024, 512, 256),
-                 radii=((0.2, 0.4, 0.8), (0.4, 0.8, 1.6), (1.6, 3.2, 4.8)),
-                 num_samples=((32, 32, 64), (32, 32, 64), (32, 32, 32)),
-                 sa_channels=(((16, 16, 32), (16, 16, 32), (32, 32, 64)),
-                              ((64, 64, 128), (64, 64, 128), (64, 96, 128)),
-                              ((128, 128, 256), (128, 192, 256), (128, 256,
-                                                                  256))),
-                 aggregation_channels=(64, 128, 256),
-                 fps_mods=(('D-FPS'), ('FS'), ('F-FPS', 'D-FPS')),
-                 fps_sample_range_lists=((-1), (-1), (512, -1)),
-                 dilated_group=(True, True, True),
-                 out_indices=(2, ),
-                 norm_cfg=dict(type='BN2d'),
-                 sa_cfg=dict(
-                     type='PointSAModuleMSG',
-                     pool_mod='max',
-                     use_xyz=True,
-                     normalize_xyz=False)):
+    def __init__(
+        self,
+        in_channels,
+        num_points=(2048, 1024, 512, 256),
+        radii=((0.2, 0.4, 0.8), (0.4, 0.8, 1.6), (1.6, 3.2, 4.8)),
+        num_samples=((32, 32, 64), (32, 32, 64), (32, 32, 32)),
+        sa_channels=(
+            ((16, 16, 32), (16, 16, 32), (32, 32, 64)),
+            ((64, 64, 128), (64, 64, 128), (64, 96, 128)),
+            ((128, 128, 256), (128, 192, 256), (128, 256, 256)),
+        ),
+        aggregation_channels=(64, 128, 256),
+        fps_mods=(("D-FPS"), ("FS"), ("F-FPS", "D-FPS")),
+        fps_sample_range_lists=((-1), (-1), (512, -1)),
+        dilated_group=(True, True, True),
+        out_indices=(2,),
+        norm_cfg=dict(type="BN2d"),
+        sa_cfg=dict(type="PointSAModuleMSG", pool_mod="max", use_xyz=True, normalize_xyz=False),
+    ):
         super().__init__()
         self.num_sa = len(sa_channels)
         self.out_indices = out_indices
         assert max(out_indices) < self.num_sa
-        assert len(num_points) == len(radii) == len(num_samples) == len(
-            sa_channels) == len(aggregation_channels)
+        assert (
+            len(num_points)
+            == len(radii)
+            == len(num_samples)
+            == len(sa_channels)
+            == len(aggregation_channels)
+        )
 
         self.SA_modules = nn.ModuleList()
         self.aggregation_mlps = nn.ModuleList()
@@ -73,8 +77,7 @@ class PointNet2SAMSG(BasePointNet):
             cur_sa_mlps = list(sa_channels[sa_index])
             sa_out_channel = 0
             for radius_index in range(len(radii[sa_index])):
-                cur_sa_mlps[radius_index] = [sa_in_channel] + list(
-                    cur_sa_mlps[radius_index])
+                cur_sa_mlps[radius_index] = [sa_in_channel] + list(cur_sa_mlps[radius_index])
                 sa_out_channel += cur_sa_mlps[radius_index][-1]
 
             if isinstance(fps_mods[sa_index], tuple):
@@ -83,11 +86,9 @@ class PointNet2SAMSG(BasePointNet):
                 cur_fps_mod = list([fps_mods[sa_index]])
 
             if isinstance(fps_sample_range_lists[sa_index], tuple):
-                cur_fps_sample_range_list = list(
-                    fps_sample_range_lists[sa_index])
+                cur_fps_sample_range_list = list(fps_sample_range_lists[sa_index])
             else:
-                cur_fps_sample_range_list = list(
-                    [fps_sample_range_lists[sa_index]])
+                cur_fps_sample_range_list = list([fps_sample_range_lists[sa_index]])
 
             self.SA_modules.append(
                 build_sa_module(
@@ -100,19 +101,23 @@ class PointNet2SAMSG(BasePointNet):
                     dilated_group=dilated_group[sa_index],
                     norm_cfg=norm_cfg,
                     cfg=sa_cfg,
-                    bias=True))
+                    bias=True,
+                )
+            )
             skip_channel_list.append(sa_out_channel)
             self.aggregation_mlps.append(
                 ConvModule(
                     sa_out_channel,
                     aggregation_channels[sa_index],
-                    conv_cfg=dict(type='Conv1d'),
-                    norm_cfg=dict(type='BN1d'),
+                    conv_cfg=dict(type="Conv1d"),
+                    norm_cfg=dict(type="BN1d"),
                     kernel_size=1,
-                    bias=True))
+                    bias=True,
+                )
+            )
             sa_in_channel = aggregation_channels[sa_index]
 
-    @auto_fp16(apply_to=('points', ))
+    @auto_fp16(apply_to=("points",))
     def forward(self, points):
         """Forward pass.
 
@@ -132,8 +137,7 @@ class PointNet2SAMSG(BasePointNet):
         xyz, features = self._split_point_feats(points)
 
         batch, num_points = xyz.shape[:2]
-        indices = xyz.new_tensor(range(num_points)).unsqueeze(0).repeat(
-            batch, 1).long()
+        indices = xyz.new_tensor(range(num_points)).unsqueeze(0).repeat(batch, 1).long()
 
         sa_xyz = [xyz]
         sa_features = [features]
@@ -144,19 +148,14 @@ class PointNet2SAMSG(BasePointNet):
         out_sa_indices = []
 
         for i in range(self.num_sa):
-            cur_xyz, cur_features, cur_indices = self.SA_modules[i](
-                sa_xyz[i], sa_features[i])
+            cur_xyz, cur_features, cur_indices = self.SA_modules[i](sa_xyz[i], sa_features[i])
             cur_features = self.aggregation_mlps[i](cur_features)
             sa_xyz.append(cur_xyz)
             sa_features.append(cur_features)
-            sa_indices.append(
-                torch.gather(sa_indices[-1], 1, cur_indices.long()))
+            sa_indices.append(torch.gather(sa_indices[-1], 1, cur_indices.long()))
             if i in self.out_indices:
                 out_sa_xyz.append(sa_xyz[-1])
                 out_sa_features.append(sa_features[-1])
                 out_sa_indices.append(sa_indices[-1])
 
-        return dict(
-            sa_xyz=out_sa_xyz,
-            sa_features=out_sa_features,
-            sa_indices=out_sa_indices)
+        return dict(sa_xyz=out_sa_xyz, sa_features=out_sa_features, sa_indices=out_sa_indices)

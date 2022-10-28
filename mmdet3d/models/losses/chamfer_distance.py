@@ -5,12 +5,9 @@ from torch.nn.functional import l1_loss, mse_loss, smooth_l1_loss
 from mmdet.models.builder import LOSSES
 
 
-def chamfer_distance(src,
-                     dst,
-                     src_weight=1.0,
-                     dst_weight=1.0,
-                     criterion_mode='l2',
-                     reduction='mean'):
+def chamfer_distance(
+    src, dst, src_weight=1.0, dst_weight=1.0, criterion_mode="l2", reduction="mean"
+):
     """Calculate Chamfer Distance of two sets.
 
     Args:
@@ -38,11 +35,11 @@ def chamfer_distance(src,
                 for each point in destination to source.
     """
 
-    if criterion_mode == 'smooth_l1':
+    if criterion_mode == "smooth_l1":
         criterion = smooth_l1_loss
-    elif criterion_mode == 'l1':
+    elif criterion_mode == "l1":
         criterion = l1_loss
-    elif criterion_mode == 'l2':
+    elif criterion_mode == "l2":
         criterion = mse_loss
     else:
         raise NotImplementedError
@@ -50,20 +47,20 @@ def chamfer_distance(src,
     src_expand = src.unsqueeze(2).repeat(1, 1, dst.shape[1], 1)
     dst_expand = dst.unsqueeze(1).repeat(1, src.shape[1], 1, 1)
 
-    distance = criterion(src_expand, dst_expand, reduction='none').sum(-1)
+    distance = criterion(src_expand, dst_expand, reduction="none").sum(-1)
     src2dst_distance, indices1 = torch.min(distance, dim=2)  # (B,N)
     dst2src_distance, indices2 = torch.min(distance, dim=1)  # (B,M)
 
-    loss_src = (src2dst_distance * src_weight)
-    loss_dst = (dst2src_distance * dst_weight)
+    loss_src = src2dst_distance * src_weight
+    loss_dst = dst2src_distance * dst_weight
 
-    if reduction == 'sum':
+    if reduction == "sum":
         loss_src = torch.sum(loss_src)
         loss_dst = torch.sum(loss_dst)
-    elif reduction == 'mean':
+    elif reduction == "mean":
         loss_src = torch.mean(loss_src)
         loss_dst = torch.mean(loss_dst)
-    elif reduction == 'none':
+    elif reduction == "none":
         pass
     else:
         raise NotImplementedError
@@ -84,28 +81,26 @@ class ChamferDistance(nn.Module):
         loss_dst_weight (float): Weight of loss_target.
     """
 
-    def __init__(self,
-                 mode='l2',
-                 reduction='mean',
-                 loss_src_weight=1.0,
-                 loss_dst_weight=1.0):
+    def __init__(self, mode="l2", reduction="mean", loss_src_weight=1.0, loss_dst_weight=1.0):
         super(ChamferDistance, self).__init__()
 
-        assert mode in ['smooth_l1', 'l1', 'l2']
-        assert reduction in ['none', 'sum', 'mean']
+        assert mode in ["smooth_l1", "l1", "l2"]
+        assert reduction in ["none", "sum", "mean"]
         self.mode = mode
         self.reduction = reduction
         self.loss_src_weight = loss_src_weight
         self.loss_dst_weight = loss_dst_weight
 
-    def forward(self,
-                source,
-                target,
-                src_weight=1.0,
-                dst_weight=1.0,
-                reduction_override=None,
-                return_indices=False,
-                **kwargs):
+    def forward(
+        self,
+        source,
+        target,
+        src_weight=1.0,
+        dst_weight=1.0,
+        reduction_override=None,
+        return_indices=False,
+        **kwargs
+    ):
         """Forward function of loss calculation.
 
         Args:
@@ -130,12 +125,12 @@ class ChamferDistance(nn.Module):
                 If ``return_indices=False``, return \
                 ``(loss_source, loss_target)``.
         """
-        assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (
-            reduction_override if reduction_override else self.reduction)
+        assert reduction_override in (None, "none", "mean", "sum")
+        reduction = reduction_override if reduction_override else self.reduction
 
         loss_source, loss_target, indices1, indices2 = chamfer_distance(
-            source, target, src_weight, dst_weight, self.mode, reduction)
+            source, target, src_weight, dst_weight, self.mode, reduction
+        )
 
         loss_source *= self.loss_src_weight
         loss_target *= self.loss_dst_weight

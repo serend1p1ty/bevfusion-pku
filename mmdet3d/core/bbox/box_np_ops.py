@@ -59,9 +59,9 @@ def corners_nd(dims, origin=0.5):
             where x0 < x1, y0 < y1, z0 < z1.
     """
     ndim = int(dims.shape[1])
-    corners_norm = np.stack(
-        np.unravel_index(np.arange(2**ndim), [2] * ndim),
-        axis=1).astype(dims.dtype)
+    corners_norm = np.stack(np.unravel_index(np.arange(2**ndim), [2] * ndim), axis=1).astype(
+        dims.dtype
+    )
     # now corners_norm has format: (2d) x0y0, x0y1, x1y0, x1y1
     # (3d) x0y0z0, x0y0z1, x0y1z0, x0y1z1, x1y0z0, x1y0z1, x1y1z0, x1y1z1
     # so need to convert to a format which is convenient to do other computing.
@@ -73,8 +73,7 @@ def corners_nd(dims, origin=0.5):
     elif ndim == 3:
         corners_norm = corners_norm[[0, 1, 3, 2, 4, 5, 7, 6]]
     corners_norm = corners_norm - np.array(origin, dtype=dims.dtype)
-    corners = dims.reshape([-1, 1, ndim]) * corners_norm.reshape(
-        [1, 2**ndim, ndim])
+    corners = dims.reshape([-1, 1, ndim]) * corners_norm.reshape([1, 2**ndim, ndim])
     return corners
 
 
@@ -92,7 +91,7 @@ def rotation_2d(points, angles):
     rot_sin = np.sin(angles)
     rot_cos = np.cos(angles)
     rot_mat_T = np.stack([[rot_cos, -rot_sin], [rot_sin, rot_cos]])
-    return np.einsum('aij,jka->aik', points, rot_mat_T)
+    return np.einsum("aij,jka->aik", points, rot_mat_T)
 
 
 def center_to_corner_box2d(centers, dims, angles=None, origin=0.5):
@@ -130,7 +129,12 @@ def depth_to_points(depth, trunc_pixel):
     Returns:
         np.ndarray: Points in camera coordinates.
     """
-    num_pts = np.sum(depth[trunc_pixel:, ] > 0.1)
+    num_pts = np.sum(
+        depth[
+            trunc_pixel:,
+        ]
+        > 0.1
+    )
     points = np.zeros((num_pts, 3), dtype=depth.dtype)
     x = np.array([0, 0, 1], dtype=depth.dtype)
     k = 0
@@ -184,25 +188,24 @@ def rotation_3d_in_axis(points, angles, axis=0):
     ones = np.ones_like(rot_cos)
     zeros = np.zeros_like(rot_cos)
     if axis == 1:
-        rot_mat_T = np.stack([[rot_cos, zeros, -rot_sin], [zeros, ones, zeros],
-                              [rot_sin, zeros, rot_cos]])
+        rot_mat_T = np.stack(
+            [[rot_cos, zeros, -rot_sin], [zeros, ones, zeros], [rot_sin, zeros, rot_cos]]
+        )
     elif axis == 2 or axis == -1:
-        rot_mat_T = np.stack([[rot_cos, -rot_sin, zeros],
-                              [rot_sin, rot_cos, zeros], [zeros, zeros, ones]])
+        rot_mat_T = np.stack(
+            [[rot_cos, -rot_sin, zeros], [rot_sin, rot_cos, zeros], [zeros, zeros, ones]]
+        )
     elif axis == 0:
-        rot_mat_T = np.stack([[zeros, rot_cos, -rot_sin],
-                              [zeros, rot_sin, rot_cos], [ones, zeros, zeros]])
+        rot_mat_T = np.stack(
+            [[zeros, rot_cos, -rot_sin], [zeros, rot_sin, rot_cos], [ones, zeros, zeros]]
+        )
     else:
-        raise ValueError('axis should in range')
+        raise ValueError("axis should in range")
 
-    return np.einsum('aij,jka->aik', points, rot_mat_T)
+    return np.einsum("aij,jka->aik", points, rot_mat_T)
 
 
-def center_to_corner_box3d(centers,
-                           dims,
-                           angles=None,
-                           origin=(0.5, 1.0, 0.5),
-                           axis=1):
+def center_to_corner_box3d(centers, dims, angles=None, origin=(0.5, 1.0, 0.5), axis=1):
     """Convert kitti locations, dimensions and angles to corners.
 
     Args:
@@ -243,8 +246,7 @@ def box2d_to_corner_jit(boxes):
     corners_norm[2] = 1.0
     corners_norm[3, 0] = 1.0
     corners_norm -= np.array([0.5, 0.5], dtype=boxes.dtype)
-    corners = boxes.reshape(num_box, 1, 5)[:, :, 2:4] * corners_norm.reshape(
-        1, 4, 2)
+    corners = boxes.reshape(num_box, 1, 5)[:, :, 2:4] * corners_norm.reshape(1, 4, 2)
     rot_mat_T = np.zeros((2, 2), dtype=boxes.dtype)
     box_corners = np.zeros((num_box, 4, 2), dtype=boxes.dtype)
     for i in range(num_box):
@@ -293,9 +295,9 @@ def corner_to_surfaces_3d_jit(corners):
     # box_corners: [N, 8, 3], must from corner functions in this module
     num_boxes = corners.shape[0]
     surfaces = np.zeros((num_boxes, 6, 4, 3), dtype=corners.dtype)
-    corner_idxes = np.array([
-        0, 1, 2, 3, 7, 6, 5, 4, 0, 3, 7, 4, 1, 5, 6, 2, 0, 4, 5, 1, 3, 2, 6, 7
-    ]).reshape(6, 4)
+    corner_idxes = np.array(
+        [0, 1, 2, 3, 7, 6, 5, 4, 0, 3, 7, 4, 1, 5, 6, 2, 0, 4, 5, 1, 3, 2, 6, 7]
+    ).reshape(6, 4)
     for i in range(num_boxes):
         for j in range(6):
             for k in range(4):
@@ -319,18 +321,18 @@ def rotation_points_single_angle(points, angle, axis=0):
     rot_cos = np.cos(angle)
     if axis == 1:
         rot_mat_T = np.array(
-            [[rot_cos, 0, -rot_sin], [0, 1, 0], [rot_sin, 0, rot_cos]],
-            dtype=points.dtype)
+            [[rot_cos, 0, -rot_sin], [0, 1, 0], [rot_sin, 0, rot_cos]], dtype=points.dtype
+        )
     elif axis == 2 or axis == -1:
         rot_mat_T = np.array(
-            [[rot_cos, -rot_sin, 0], [rot_sin, rot_cos, 0], [0, 0, 1]],
-            dtype=points.dtype)
+            [[rot_cos, -rot_sin, 0], [rot_sin, rot_cos, 0], [0, 0, 1]], dtype=points.dtype
+        )
     elif axis == 0:
         rot_mat_T = np.array(
-            [[1, 0, 0], [0, rot_cos, -rot_sin], [0, rot_sin, rot_cos]],
-            dtype=points.dtype)
+            [[1, 0, 0], [0, rot_cos, -rot_sin], [0, rot_sin, rot_cos]], dtype=points.dtype
+        )
     else:
-        raise ValueError('axis should in range')
+        raise ValueError("axis should in range")
 
     return points @ rot_mat_T, rot_mat_T
 
@@ -364,7 +366,8 @@ def box3d_to_bbox(box3d, P2):
         np.ndarray, shape=[N, 4]: Boxes 2d in image coordinates.
     """
     box_corners = center_to_corner_box3d(
-        box3d[:, :3], box3d[:, 3:6], box3d[:, 6], [0.5, 1.0, 0.5], axis=1)
+        box3d[:, :3], box3d[:, 3:6], box3d[:, 6], [0.5, 1.0, 0.5], axis=1
+    )
     box_corners_in_image = points_cam2img(box_corners, P2)
     # box_corners_in_image: [N, 8, 2]
     minxy = np.min(box_corners_in_image, axis=1)
@@ -384,14 +387,16 @@ def corner_to_surfaces_3d(corners):
         np.ndarray: Surfaces with the shape of (N, 6, 4, 3).
     """
     # box_corners: [N, 8, 3], must from corner functions in this module
-    surfaces = np.array([
-        [corners[:, 0], corners[:, 1], corners[:, 2], corners[:, 3]],
-        [corners[:, 7], corners[:, 6], corners[:, 5], corners[:, 4]],
-        [corners[:, 0], corners[:, 3], corners[:, 7], corners[:, 4]],
-        [corners[:, 1], corners[:, 5], corners[:, 6], corners[:, 2]],
-        [corners[:, 0], corners[:, 4], corners[:, 5], corners[:, 1]],
-        [corners[:, 3], corners[:, 2], corners[:, 6], corners[:, 7]],
-    ]).transpose([2, 0, 1, 3])
+    surfaces = np.array(
+        [
+            [corners[:, 0], corners[:, 1], corners[:, 2], corners[:, 3]],
+            [corners[:, 7], corners[:, 6], corners[:, 5], corners[:, 4]],
+            [corners[:, 0], corners[:, 3], corners[:, 7], corners[:, 4]],
+            [corners[:, 1], corners[:, 5], corners[:, 6], corners[:, 2]],
+            [corners[:, 0], corners[:, 4], corners[:, 5], corners[:, 1]],
+            [corners[:, 3], corners[:, 2], corners[:, 6], corners[:, 7]],
+        ]
+    ).transpose([2, 0, 1, 3])
     return surfaces
 
 
@@ -410,7 +415,8 @@ def points_in_rbbox(points, rbbox, z_axis=2, origin=(0.5, 0.5, 0)):
     # TODO: this function is different from PointCloud3D, be careful
     # when start to use nuscene, check the input
     rbbox_corners = center_to_corner_box3d(
-        rbbox[:, :3], rbbox[:, 3:6], rbbox[:, 6], origin=origin, axis=z_axis)
+        rbbox[:, :3], rbbox[:, 3:6], rbbox[:, 6], origin=origin, axis=z_axis
+    )
     surfaces = corner_to_surfaces_3d(rbbox_corners)
     indices = points_in_convex_polygon_3d_jit(points[:, :3], surfaces)
     return indices
@@ -447,11 +453,13 @@ def limit_period(val, offset=0.5, period=np.pi):
     return val - np.floor(val / period + offset) * period
 
 
-def create_anchors_3d_range(feature_size,
-                            anchor_range,
-                            sizes=((1.6, 3.9, 1.56), ),
-                            rotations=(0, np.pi / 2),
-                            dtype=np.float32):
+def create_anchors_3d_range(
+    feature_size,
+    anchor_range,
+    sizes=((1.6, 3.9, 1.56),),
+    rotations=(0, np.pi / 2),
+    dtype=np.float32,
+):
     """Create anchors 3d by range.
 
     Args:
@@ -471,16 +479,12 @@ def create_anchors_3d_range(feature_size,
             (*feature_size, num_sizes, num_rots, 7).
     """
     anchor_range = np.array(anchor_range, dtype)
-    z_centers = np.linspace(
-        anchor_range[2], anchor_range[5], feature_size[0], dtype=dtype)
-    y_centers = np.linspace(
-        anchor_range[1], anchor_range[4], feature_size[1], dtype=dtype)
-    x_centers = np.linspace(
-        anchor_range[0], anchor_range[3], feature_size[2], dtype=dtype)
+    z_centers = np.linspace(anchor_range[2], anchor_range[5], feature_size[0], dtype=dtype)
+    y_centers = np.linspace(anchor_range[1], anchor_range[4], feature_size[1], dtype=dtype)
+    x_centers = np.linspace(anchor_range[0], anchor_range[3], feature_size[2], dtype=dtype)
     sizes = np.reshape(np.array(sizes, dtype=dtype), [-1, 3])
     rotations = np.array(rotations, dtype=dtype)
-    rets = np.meshgrid(
-        x_centers, y_centers, z_centers, rotations, indexing='ij')
+    rets = np.meshgrid(x_centers, y_centers, z_centers, rotations, indexing="ij")
     tile_shape = [1] * 5
     tile_shape[-2] = int(sizes.shape[0])
     for i in range(len(rets)):
@@ -507,8 +511,7 @@ def center_to_minmax_2d(centers, dims, origin=0.5):
         np.ndarray: Minmax points.
     """
     if origin == 0.5:
-        return np.concatenate([centers - dims / 2, centers + dims / 2],
-                              axis=-1)
+        return np.concatenate([centers - dims / 2, centers + dims / 2], axis=-1)
     corners = center_to_corner_box2d(centers, dims, origin=origin)
     return corners[:, [0, 2]].reshape([-1, 4])
 
@@ -533,7 +536,7 @@ def rbbox2d_to_near_bbox(rbboxes):
 
 
 @numba.jit(nopython=True)
-def iou_jit(boxes, query_boxes, mode='iou', eps=0.0):
+def iou_jit(boxes, query_boxes, mode="iou", eps=0.0):
     """Calculate box iou. Note that jit version runs ~10x faster than the
     box_overlaps function in mmdet3d.core.evaluation.
 
@@ -549,24 +552,22 @@ def iou_jit(boxes, query_boxes, mode='iou', eps=0.0):
     K = query_boxes.shape[0]
     overlaps = np.zeros((N, K), dtype=boxes.dtype)
     for k in range(K):
-        box_area = ((query_boxes[k, 2] - query_boxes[k, 0] + eps) *
-                    (query_boxes[k, 3] - query_boxes[k, 1] + eps))
+        box_area = (query_boxes[k, 2] - query_boxes[k, 0] + eps) * (
+            query_boxes[k, 3] - query_boxes[k, 1] + eps
+        )
         for n in range(N):
-            iw = (
-                min(boxes[n, 2], query_boxes[k, 2]) -
-                max(boxes[n, 0], query_boxes[k, 0]) + eps)
+            iw = min(boxes[n, 2], query_boxes[k, 2]) - max(boxes[n, 0], query_boxes[k, 0]) + eps
             if iw > 0:
-                ih = (
-                    min(boxes[n, 3], query_boxes[k, 3]) -
-                    max(boxes[n, 1], query_boxes[k, 1]) + eps)
+                ih = min(boxes[n, 3], query_boxes[k, 3]) - max(boxes[n, 1], query_boxes[k, 1]) + eps
                 if ih > 0:
-                    if mode == 'iou':
-                        ua = ((boxes[n, 2] - boxes[n, 0] + eps) *
-                              (boxes[n, 3] - boxes[n, 1] + eps) + box_area -
-                              iw * ih)
+                    if mode == "iou":
+                        ua = (
+                            (boxes[n, 2] - boxes[n, 0] + eps) * (boxes[n, 3] - boxes[n, 1] + eps)
+                            + box_area
+                            - iw * ih
+                        )
                     else:
-                        ua = ((boxes[n, 2] - boxes[n, 0] + eps) *
-                              (boxes[n, 3] - boxes[n, 1] + eps))
+                        ua = (boxes[n, 2] - boxes[n, 0] + eps) * (boxes[n, 3] - boxes[n, 1] + eps)
                     overlaps[n, k] = iw * ih / ua
     return overlaps
 
@@ -638,18 +639,16 @@ def get_frustum(bbox_image, C, near_clip=0.001, far_clip=100):
     fku = C[0, 0]
     fkv = -C[1, 1]
     u0v0 = C[0:2, 2]
-    z_points = np.array(
-        [near_clip] * 4 + [far_clip] * 4, dtype=C.dtype)[:, np.newaxis]
+    z_points = np.array([near_clip] * 4 + [far_clip] * 4, dtype=C.dtype)[:, np.newaxis]
     b = bbox_image
-    box_corners = np.array(
-        [[b[0], b[1]], [b[0], b[3]], [b[2], b[3]], [b[2], b[1]]],
-        dtype=C.dtype)
+    box_corners = np.array([[b[0], b[1]], [b[0], b[3]], [b[2], b[3]], [b[2], b[1]]], dtype=C.dtype)
     near_box_corners = (box_corners - u0v0) / np.array(
-        [fku / near_clip, -fkv / near_clip], dtype=C.dtype)
+        [fku / near_clip, -fkv / near_clip], dtype=C.dtype
+    )
     far_box_corners = (box_corners - u0v0) / np.array(
-        [fku / far_clip, -fkv / far_clip], dtype=C.dtype)
-    ret_xy = np.concatenate([near_box_corners, far_box_corners],
-                            axis=0)  # [8, 2]
+        [fku / far_clip, -fkv / far_clip], dtype=C.dtype
+    )
+    ret_xy = np.concatenate([near_box_corners, far_box_corners], axis=0)  # [8, 2]
     ret_xyz = np.concatenate([ret_xy, z_points], axis=1)
     return ret_xyz
 
@@ -668,19 +667,17 @@ def surface_equ_3d(polygon_surfaces):
     """
     # return [a, b, c], d in ax+by+cz+d=0
     # polygon_surfaces: [num_polygon, num_surfaces, num_points_of_polygon, 3]
-    surface_vec = polygon_surfaces[:, :, :2, :] - \
-        polygon_surfaces[:, :, 1:3, :]
+    surface_vec = polygon_surfaces[:, :, :2, :] - polygon_surfaces[:, :, 1:3, :]
     # normal_vec: [..., 3]
     normal_vec = np.cross(surface_vec[:, :, 0, :], surface_vec[:, :, 1, :])
     # print(normal_vec.shape, points[..., 0, :].shape)
     # d = -np.inner(normal_vec, points[..., 0, :])
-    d = np.einsum('aij, aij->ai', normal_vec, polygon_surfaces[:, :, 0, :])
+    d = np.einsum("aij, aij->ai", normal_vec, polygon_surfaces[:, :, 0, :])
     return normal_vec, -d
 
 
 @numba.njit
-def _points_in_convex_polygon_3d_jit(points, polygon_surfaces, normal_vec, d,
-                                     num_surfaces):
+def _points_in_convex_polygon_3d_jit(points, polygon_surfaces, normal_vec, d, num_surfaces):
     """
     Args:
         points (np.ndarray): Input points with shape of (num_points, 3).
@@ -707,18 +704,18 @@ def _points_in_convex_polygon_3d_jit(points, polygon_surfaces, normal_vec, d,
                 if k > num_surfaces[j]:
                     break
                 sign = (
-                    points[i, 0] * normal_vec[j, k, 0] +
-                    points[i, 1] * normal_vec[j, k, 1] +
-                    points[i, 2] * normal_vec[j, k, 2] + d[j, k])
+                    points[i, 0] * normal_vec[j, k, 0]
+                    + points[i, 1] * normal_vec[j, k, 1]
+                    + points[i, 2] * normal_vec[j, k, 2]
+                    + d[j, k]
+                )
                 if sign >= 0:
                     ret[i, j] = False
                     break
     return ret
 
 
-def points_in_convex_polygon_3d_jit(points,
-                                    polygon_surfaces,
-                                    num_surfaces=None):
+def points_in_convex_polygon_3d_jit(points, polygon_surfaces, num_surfaces=None):
     """Check points is in 3d convex polygons.
 
     Args:
@@ -737,12 +734,11 @@ def points_in_convex_polygon_3d_jit(points,
     # num_points = points.shape[0]
     num_polygons = polygon_surfaces.shape[0]
     if num_surfaces is None:
-        num_surfaces = np.full((num_polygons, ), 9999999, dtype=np.int64)
+        num_surfaces = np.full((num_polygons,), 9999999, dtype=np.int64)
     normal_vec, d = surface_equ_3d(polygon_surfaces[:, :, :3, :])
     # normal_vec: [num_polygon, max_num_surfaces, 3]
     # d: [num_polygon, max_num_surfaces]
-    return _points_in_convex_polygon_3d_jit(points, polygon_surfaces,
-                                            normal_vec, d, num_surfaces)
+    return _points_in_convex_polygon_3d_jit(points, polygon_surfaces, normal_vec, d, num_surfaces)
 
 
 @numba.jit
@@ -813,32 +809,33 @@ def boxes3d_to_corners3d_lidar(boxes3d, bottom_center=True):
     boxes_num = boxes3d.shape[0]
     w, l, h = boxes3d[:, 3], boxes3d[:, 4], boxes3d[:, 5]
     x_corners = np.array(
-        [w / 2., -w / 2., -w / 2., w / 2., w / 2., -w / 2., -w / 2., w / 2.],
-        dtype=np.float32).T
+        [w / 2.0, -w / 2.0, -w / 2.0, w / 2.0, w / 2.0, -w / 2.0, -w / 2.0, w / 2.0],
+        dtype=np.float32,
+    ).T
     y_corners = np.array(
-        [-l / 2., -l / 2., l / 2., l / 2., -l / 2., -l / 2., l / 2., l / 2.],
-        dtype=np.float32).T
+        [-l / 2.0, -l / 2.0, l / 2.0, l / 2.0, -l / 2.0, -l / 2.0, l / 2.0, l / 2.0],
+        dtype=np.float32,
+    ).T
     if bottom_center:
         z_corners = np.zeros((boxes_num, 8), dtype=np.float32)
         z_corners[:, 4:8] = h.reshape(boxes_num, 1).repeat(4, axis=1)  # (N, 8)
     else:
-        z_corners = np.array([
-            -h / 2., -h / 2., -h / 2., -h / 2., h / 2., h / 2., h / 2., h / 2.
-        ],
-                             dtype=np.float32).T
+        z_corners = np.array(
+            [-h / 2.0, -h / 2.0, -h / 2.0, -h / 2.0, h / 2.0, h / 2.0, h / 2.0, h / 2.0],
+            dtype=np.float32,
+        ).T
 
     ry = boxes3d[:, 6]
-    zeros, ones = np.zeros(
-        ry.size, dtype=np.float32), np.ones(
-            ry.size, dtype=np.float32)
-    rot_list = np.array([[np.cos(ry), -np.sin(ry), zeros],
-                         [np.sin(ry), np.cos(ry), zeros], [zeros, zeros,
-                                                           ones]])  # (3, 3, N)
+    zeros, ones = np.zeros(ry.size, dtype=np.float32), np.ones(ry.size, dtype=np.float32)
+    rot_list = np.array(
+        [[np.cos(ry), -np.sin(ry), zeros], [np.sin(ry), np.cos(ry), zeros], [zeros, zeros, ones]]
+    )  # (3, 3, N)
     R_list = np.transpose(rot_list, (2, 0, 1))  # (N, 3, 3)
 
-    temp_corners = np.concatenate((x_corners.reshape(
-        -1, 8, 1), y_corners.reshape(-1, 8, 1), z_corners.reshape(-1, 8, 1)),
-                                  axis=2)  # (N, 8, 3)
+    temp_corners = np.concatenate(
+        (x_corners.reshape(-1, 8, 1), y_corners.reshape(-1, 8, 1), z_corners.reshape(-1, 8, 1)),
+        axis=2,
+    )  # (N, 8, 3)
     rotated_corners = np.matmul(temp_corners, R_list)  # (N, 8, 3)
     x_corners = rotated_corners[:, :, 0]
     y_corners = rotated_corners[:, :, 1]
@@ -851,7 +848,7 @@ def boxes3d_to_corners3d_lidar(boxes3d, bottom_center=True):
     z = z_loc.reshape(-1, 1) + z_corners.reshape(-1, 8)
 
     corners = np.concatenate(
-        (x.reshape(-1, 8, 1), y.reshape(-1, 8, 1), z.reshape(-1, 8, 1)),
-        axis=2)
+        (x.reshape(-1, 8, 1), y.reshape(-1, 8, 1), z.reshape(-1, 8, 1)), axis=2
+    )
 
     return corners.astype(np.float32)

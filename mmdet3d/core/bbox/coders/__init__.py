@@ -6,6 +6,10 @@ from .partial_bin_based_bbox_coder import PartialBinBasedBBoxCoder
 from .transfusion_bbox_coder import TransFusionBBoxCoder
 
 __all__ = [
-    'build_bbox_coder', 'DeltaXYZWLHRBBoxCoder', 'PartialBinBasedBBoxCoder',
-    'CenterPointBBoxCoder', 'AnchorFreeBBoxCoder', 'TransFusionBBoxCoder'
+    "build_bbox_coder",
+    "DeltaXYZWLHRBBoxCoder",
+    "PartialBinBasedBBoxCoder",
+    "CenterPointBBoxCoder",
+    "AnchorFreeBBoxCoder",
+    "TransFusionBBoxCoder",
 ]

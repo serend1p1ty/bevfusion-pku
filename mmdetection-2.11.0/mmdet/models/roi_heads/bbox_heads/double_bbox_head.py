@@ -19,11 +19,7 @@ class BasicResBlock(nn.Module):
         norm_cfg (dict): The config dict for normalization layers.
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 conv_cfg=None,
-                 norm_cfg=dict(type='BN')):
+    def __init__(self, in_channels, out_channels, conv_cfg=None, norm_cfg=dict(type="BN")):
         super(BasicResBlock, self).__init__()
 
         # main path
@@ -34,7 +30,8 @@ class BasicResBlock(nn.Module):
             padding=1,
             bias=False,
             conv_cfg=conv_cfg,
-            norm_cfg=norm_cfg)
+            norm_cfg=norm_cfg,
+        )
         self.conv2 = ConvModule(
             in_channels,
             out_channels,
@@ -42,7 +39,8 @@ class BasicResBlock(nn.Module):
             bias=False,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
-            act_cfg=None)
+            act_cfg=None,
+        )
 
         # identity path
         self.conv_identity = ConvModule(
@@ -51,7 +49,8 @@ class BasicResBlock(nn.Module):
             kernel_size=1,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
-            act_cfg=None)
+            act_cfg=None,
+        )
 
         self.relu = nn.ReLU(inplace=True)
 
@@ -83,15 +82,17 @@ class DoubleConvFCBBoxHead(BBoxHead):
                                           \-> reg
     """  # noqa: W605
 
-    def __init__(self,
-                 num_convs=0,
-                 num_fcs=0,
-                 conv_out_channels=1024,
-                 fc_out_channels=1024,
-                 conv_cfg=None,
-                 norm_cfg=dict(type='BN'),
-                 **kwargs):
-        kwargs.setdefault('with_avg_pool', True)
+    def __init__(
+        self,
+        num_convs=0,
+        num_fcs=0,
+        conv_out_channels=1024,
+        fc_out_channels=1024,
+        conv_cfg=None,
+        norm_cfg=dict(type="BN"),
+        **kwargs
+    ):
+        kwargs.setdefault("with_avg_pool", True)
         super(DoubleConvFCBBoxHead, self).__init__(**kwargs)
         assert self.with_avg_pool
         assert num_convs > 0
@@ -104,8 +105,7 @@ class DoubleConvFCBBoxHead(BBoxHead):
         self.norm_cfg = norm_cfg
 
         # increase the channel of input features
-        self.res_block = BasicResBlock(self.in_channels,
-                                       self.conv_out_channels)
+        self.res_block = BasicResBlock(self.in_channels, self.conv_out_channels)
 
         # add conv heads
         self.conv_branch = self._add_conv_branch()
@@ -127,7 +127,9 @@ class DoubleConvFCBBoxHead(BBoxHead):
                     inplanes=self.conv_out_channels,
                     planes=self.conv_out_channels // 4,
                     conv_cfg=self.conv_cfg,
-                    norm_cfg=self.norm_cfg))
+                    norm_cfg=self.norm_cfg,
+                )
+            )
         return branch_convs
 
     def _add_fc_branch(self):
@@ -135,8 +137,8 @@ class DoubleConvFCBBoxHead(BBoxHead):
         branch_fcs = nn.ModuleList()
         for i in range(self.num_fcs):
             fc_in_channels = (
-                self.in_channels *
-                self.roi_feat_area if i == 0 else self.fc_out_channels)
+                self.in_channels * self.roi_feat_area if i == 0 else self.fc_out_channels
+            )
             branch_fcs.append(nn.Linear(fc_in_channels, self.fc_out_channels))
         return branch_fcs
 
@@ -147,7 +149,7 @@ class DoubleConvFCBBoxHead(BBoxHead):
 
         for m in self.fc_branch.modules():
             if isinstance(m, nn.Linear):
-                xavier_init(m, distribution='uniform')
+                xavier_init(m, distribution="uniform")
 
     def forward(self, x_cls, x_reg):
         # conv head

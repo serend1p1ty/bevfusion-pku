@@ -2,8 +2,7 @@ import numpy as np
 import torch
 from enum import IntEnum, unique
 
-from mmdet3d.core.points import (BasePoints, CameraPoints, DepthPoints,
-                                 LiDARPoints)
+from mmdet3d.core.points import BasePoints, CameraPoints, DepthPoints, LiDARPoints
 from .base_box3d import BaseInstance3DBoxes
 from .cam_box3d import CameraInstance3DBoxes
 from .depth_box3d import DepthInstance3DBoxes
@@ -100,8 +99,9 @@ class Coord3DMode(IntEnum):
         single_box = isinstance(box, (list, tuple))
         if single_box:
             assert len(box) >= 7, (
-                'CoordMode.convert takes either a k-tuple/list or '
-                'an Nxk array/tensor, where k >= 7')
+                "CoordMode.convert takes either a k-tuple/list or "
+                "an Nxk array/tensor, where k >= 7"
+            )
             arr = torch.tensor(box)[None, :]
         else:
             # avoid modifying the input box
@@ -140,14 +140,13 @@ class Coord3DMode(IntEnum):
             xyz_size = torch.cat([y_size, x_size, z_size], dim=-1)
         else:
             raise NotImplementedError(
-                f'Conversion from Coord3DMode {src} to {dst} '
-                'is not supported yet')
+                f"Conversion from Coord3DMode {src} to {dst} " "is not supported yet"
+            )
 
         if not isinstance(rt_mat, torch.Tensor):
             rt_mat = arr.new_tensor(rt_mat)
         if rt_mat.size(1) == 4:
-            extended_xyz = torch.cat(
-                [arr[:, :3], arr.new_ones(arr.size(0), 1)], dim=-1)
+            extended_xyz = torch.cat([arr[:, :3], arr.new_ones(arr.size(0), 1)], dim=-1)
             xyz = extended_xyz @ rt_mat.t()
         else:
             xyz = arr[:, :3] @ rt_mat.t()
@@ -170,10 +169,9 @@ class Coord3DMode(IntEnum):
                 target_type = DepthInstance3DBoxes
             else:
                 raise NotImplementedError(
-                    f'Conversion to {dst} through {original_type}'
-                    ' is not supported yet')
-            return target_type(
-                arr, box_dim=arr.size(-1), with_yaw=box.with_yaw)
+                    f"Conversion to {dst} through {original_type}" " is not supported yet"
+                )
+            return target_type(arr, box_dim=arr.size(-1), with_yaw=box.with_yaw)
         else:
             return arr
 
@@ -205,8 +203,9 @@ class Coord3DMode(IntEnum):
         single_point = isinstance(point, (list, tuple))
         if single_point:
             assert len(point) >= 3, (
-                'CoordMode.convert takes either a k-tuple/list or '
-                'an Nxk array/tensor, where k >= 3')
+                "CoordMode.convert takes either a k-tuple/list or "
+                "an Nxk array/tensor, where k >= 3"
+            )
             arr = torch.tensor(point)[None, :]
         else:
             # avoid modifying the input point
@@ -228,27 +227,25 @@ class Coord3DMode(IntEnum):
             if rt_mat is None:
                 rt_mat = arr.new_tensor([[1, 0, 0], [0, 0, -1], [0, 1, 0]])
             else:
-                rt_mat = rt_mat.new_tensor(
-                    [[1, 0, 0], [0, 0, -1], [0, 1, 0]]) @ \
-                    rt_mat.transpose(1, 0)
+                rt_mat = rt_mat.new_tensor([[1, 0, 0], [0, 0, -1], [0, 1, 0]]) @ rt_mat.transpose(
+                    1, 0
+                )
         elif src == Coord3DMode.CAM and dst == Coord3DMode.DEPTH:
             if rt_mat is None:
                 rt_mat = arr.new_tensor([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
             else:
-                rt_mat = rt_mat @ rt_mat.new_tensor([[1, 0, 0], [0, 0, 1],
-                                                     [0, -1, 0]])
+                rt_mat = rt_mat @ rt_mat.new_tensor([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
         elif src == Coord3DMode.LIDAR and dst == Coord3DMode.DEPTH:
             rt_mat = arr.new_tensor([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
         elif src == Coord3DMode.DEPTH and dst == Coord3DMode.LIDAR:
             rt_mat = arr.new_tensor([[0, 1, 0], [-1, 0, 0], [0, 0, 1]])
         else:
             raise NotImplementedError(
-                f'Conversion from Coord3DMode {src} to {dst} '
-                'is not supported yet')
+                f"Conversion from Coord3DMode {src} to {dst} " "is not supported yet"
+            )
 
         if rt_mat.size(1) == 4:
-            extended_xyz = torch.cat(
-                [arr[:, :3], arr.new_ones(arr.size(0), 1)], dim=-1)
+            extended_xyz = torch.cat([arr[:, :3], arr.new_ones(arr.size(0), 1)], dim=-1)
             xyz = extended_xyz @ rt_mat.t()
         else:
             xyz = arr[:, :3] @ rt_mat.t()
@@ -271,11 +268,8 @@ class Coord3DMode(IntEnum):
                 target_type = DepthPoints
             else:
                 raise NotImplementedError(
-                    f'Conversion to {dst} through {original_type}'
-                    ' is not supported yet')
-            return target_type(
-                arr,
-                points_dim=arr.size(-1),
-                attribute_dims=point.attribute_dims)
+                    f"Conversion to {dst} through {original_type}" " is not supported yet"
+                )
+            return target_type(arr, points_dim=arr.size(-1), attribute_dims=point.attribute_dims)
         else:
             return arr

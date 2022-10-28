@@ -9,12 +9,13 @@ from matplotlib import pyplot as plt
 
 
 def translate(points: np.ndarray, x: np.ndarray) -> None:
-        """
-        Applies a translation to the point cloud.
-        :param x: <np.float: 3, 1>. Translation in x, y, z.
-        """
-        for i in range(3):
-            points[i, :] = points[i, :] + x[i]
+    """
+    Applies a translation to the point cloud.
+    :param x: <np.float: 3, 1>. Translation in x, y, z.
+    """
+    for i in range(3):
+        points[i, :] = points[i, :] + x[i]
+
 
 def rotate(points: np.ndarray, rot_matrix: np.ndarray) -> None:
     """
@@ -22,6 +23,7 @@ def rotate(points: np.ndarray, rot_matrix: np.ndarray) -> None:
     :param rot_matrix: <np.float: 3, 3>. Rotation matrix.
     """
     points[:3, :] = np.dot(rot_matrix, points[:3, :])
+
 
 def view_points(points: np.ndarray, view: np.ndarray, normalize: bool) -> np.ndarray:
     """
@@ -47,7 +49,7 @@ def view_points(points: np.ndarray, view: np.ndarray, normalize: bool) -> np.nda
     assert points.shape[0] == 3
 
     viewpad = np.eye(4)
-    viewpad[:view.shape[0], :view.shape[1]] = view
+    viewpad[: view.shape[0], : view.shape[1]] = view
 
     nbr_points = points.shape[1]
 
@@ -57,15 +59,17 @@ def view_points(points: np.ndarray, view: np.ndarray, normalize: bool) -> np.nda
     points = points[:3, :]
 
     if normalize:
-        #TODO: check why have zeros value here
+        # TODO: check why have zeros value here
         z = points[2:3, :].repeat(3, 0).reshape(3, nbr_points)
         points = points / (z + 1e-10)
 
     return points
 
+
 def vis_depth(img, depth, name):
     from matplotlib import pyplot as plt
     import cv2
+
     h, w = depth.shape
     x = []
     y = []
@@ -74,26 +78,24 @@ def vis_depth(img, depth, name):
         y.append(np.arange(w))
     x = np.concatenate(x)
     y = np.concatenate(y)
-    img= ((img.permute(1,2,0)+3)/6).cpu().numpy().astype(np.float32)
-    if img.shape[0]!=h:
+    img = ((img.permute(1, 2, 0) + 3) / 6).cpu().numpy().astype(np.float32)
+    if img.shape[0] != h:
         img = cv2.resize(img, (w, h))
     depth = depth.view(-1).cpu().numpy()
-    mask = depth>0
+    mask = depth > 0
     x = x[mask].astype(np.int32)
     y = y[mask].astype(np.int32)
     depth = depth[mask]
     fig, ax = plt.subplots()
     ax.imshow(img.astype(np.float32))
     ax.scatter(y, x, c=depth, s=1)
-    ax.axis('off')
-    fig.savefig('work_dirs/img_{}.png'.format(name),bbox_inches='tight',pad_inches = 0)
+    ax.axis("off")
+    fig.savefig("work_dirs/img_{}.png".format(name), bbox_inches="tight", pad_inches=0)
 
-def map_pointcloud_to_image(points, 
-                                img,
-                                sensor2lidar_r,
-                                sensor2lidar_t,
-                                camera_intrinsic,
-                                show=False):
+
+def map_pointcloud_to_image(
+    points, img, sensor2lidar_r, sensor2lidar_t, camera_intrinsic, show=False
+):
     """
     Given a point sensor (lidar/radar) token and camera sample_data token, load pointcloud and map it to the image
     plane.
@@ -114,7 +116,7 @@ def map_pointcloud_to_image(points,
     points = copy.deepcopy(points.T)
     translate(points, -sensor2lidar_t)
     rotate(points, sensor2lidar_r.T)
-    
+
     # Fifth step: actually take a "picture" of the point cloud.
     # Grab the depths (camera frame z axis points away from the camera).
     depths = points[2, :]
@@ -126,7 +128,7 @@ def map_pointcloud_to_image(points,
     # Also make sure points are at least 1m in front of the camera to avoid seeing the lidar points on the camera
     # casing for non-keyframes which are slightly out of sync.
     mask = np.ones(depths.shape[0], dtype=bool)
-    mask = np.logical_and(mask, depths > 1.)
+    mask = np.logical_and(mask, depths > 1.0)
     mask = np.logical_and(mask, points[0, :] > 1)
     mask = np.logical_and(mask, points[0, :] < img.shape[1] - 1)
     mask = np.logical_and(mask, points[1, :] > 1)
@@ -134,27 +136,23 @@ def map_pointcloud_to_image(points,
     points = points[:, mask]
     coloring = coloring[mask]
     depth_map = np.zeros((img.shape[0], img.shape[1]), dtype=np.float32)
-    xs = np.minimum((points[0,:] + 0.5).astype(np.int32), depth_map.shape[1])
-    ys = np.minimum((points[1,:] + 0.5).astype(np.int32), depth_map.shape[0])
+    xs = np.minimum((points[0, :] + 0.5).astype(np.int32), depth_map.shape[1])
+    ys = np.minimum((points[1, :] + 0.5).astype(np.int32), depth_map.shape[0])
     for x, y, c in zip(xs, ys, coloring):
         depth_map[y, x] = c
     if show:
-        if not os.path.exists('work_dirs'):
-            os.mkdir('work_dirs')
-        plt.imsave('work_dirs/depth_map.png', depth_map, dpi=1)
+        if not os.path.exists("work_dirs"):
+            os.mkdir("work_dirs")
+        plt.imsave("work_dirs/depth_map.png", depth_map, dpi=1)
         fig, ax = plt.subplots()
         ax.imshow(img)
         ax.scatter(points[0, :], points[1, :], c=coloring, s=1)
-        ax.axis('off')
-        fig.savefig('work_dirs/img_depth.png',bbox_inches='tight',pad_inches = 0)
+        ax.axis("off")
+        fig.savefig("work_dirs/img_depth.png", bbox_inches="tight", pad_inches=0)
     return depth_map
 
 
-def project_pts_on_img(points,
-                       raw_img,
-                       lidar2img_rt,
-                       max_distance=70,
-                       thickness=-1):
+def project_pts_on_img(points, raw_img, lidar2img_rt, max_distance=70, thickness=-1):
     """Project the 3D points cloud on 2D image.
 
     Args:
@@ -177,36 +175,33 @@ def project_pts_on_img(points,
     pts_2d[:, 0] /= pts_2d[:, 2]
     pts_2d[:, 1] /= pts_2d[:, 2]
 
-    fov_inds = ((pts_2d[:, 0] < img.shape[1])
-                & (pts_2d[:, 0] >= 0)
-                & (pts_2d[:, 1] < img.shape[0])
-                & (pts_2d[:, 1] >= 0))
+    fov_inds = (
+        (pts_2d[:, 0] < img.shape[1])
+        & (pts_2d[:, 0] >= 0)
+        & (pts_2d[:, 1] < img.shape[0])
+        & (pts_2d[:, 1] >= 0)
+    )
 
     imgfov_pts_2d = pts_2d[fov_inds, :3]  # u, v, d
 
-    cmap = plt.cm.get_cmap('hsv', 256)
+    cmap = plt.cm.get_cmap("hsv", 256)
     cmap = np.array([cmap(i) for i in range(256)])[:, :3] * 255
     for i in range(imgfov_pts_2d.shape[0]):
         depth = imgfov_pts_2d[i, 2]
         color = cmap[np.clip(int(max_distance * 10 / depth), 0, 255), :]
         cv2.circle(
             img,
-            center=(int(np.round(imgfov_pts_2d[i, 0])),
-                    int(np.round(imgfov_pts_2d[i, 1]))),
+            center=(int(np.round(imgfov_pts_2d[i, 0])), int(np.round(imgfov_pts_2d[i, 1]))),
             radius=1,
             color=tuple(color),
             thickness=thickness,
         )
-    cv2.imwrite('work_dirs/project_pts_img.png', img.astype(np.uint8))
+    cv2.imwrite("work_dirs/project_pts_img.png", img.astype(np.uint8))
     # cv2.imshow('project_pts_img', img.astype(np.uint8))
     # cv2.waitKey(100)
 
 
-def plot_rect3d_on_img(img,
-                       num_rects,
-                       rect_corners,
-                       color=(0, 255, 0),
-                       thickness=1):
+def plot_rect3d_on_img(img, num_rects, rect_corners, color=(0, 255, 0), thickness=1):
     """Plot the boundary lines of 3D rectangular on 2D images.
 
     Args:
@@ -218,24 +213,38 @@ def plot_rect3d_on_img(img,
             Default: (0, 255, 0).
         thickness (int, optional): The thickness of bboxes. Default: 1.
     """
-    line_indices = ((0, 1), (0, 3), (0, 4), (1, 2), (1, 5), (3, 2), (3, 7),
-                    (4, 5), (4, 7), (2, 6), (5, 6), (6, 7))
+    line_indices = (
+        (0, 1),
+        (0, 3),
+        (0, 4),
+        (1, 2),
+        (1, 5),
+        (3, 2),
+        (3, 7),
+        (4, 5),
+        (4, 7),
+        (2, 6),
+        (5, 6),
+        (6, 7),
+    )
     for i in range(num_rects):
         corners = rect_corners[i].astype(np.int)
         for start, end in line_indices:
-            cv2.line(img, (corners[start, 0], corners[start, 1]),
-                     (corners[end, 0], corners[end, 1]), color, thickness,
-                     cv2.LINE_AA)
+            cv2.line(
+                img,
+                (corners[start, 0], corners[start, 1]),
+                (corners[end, 0], corners[end, 1]),
+                color,
+                thickness,
+                cv2.LINE_AA,
+            )
 
     return img.astype(np.uint8)
 
 
-def draw_lidar_bbox3d_on_img(bboxes3d,
-                             raw_img,
-                             lidar2img_rt,
-                             img_metas,
-                             color=(0, 255, 0),
-                             thickness=1):
+def draw_lidar_bbox3d_on_img(
+    bboxes3d, raw_img, lidar2img_rt, img_metas, color=(0, 255, 0), thickness=1
+):
     """Project the 3D bbox on 2D plane and draw on input image.
 
     Args:
@@ -252,9 +261,7 @@ def draw_lidar_bbox3d_on_img(bboxes3d,
     img = raw_img.copy()
     corners_3d = bboxes3d.corners
     num_bbox = corners_3d.shape[0]
-    pts_4d = np.concatenate(
-        [corners_3d.reshape(-1, 3),
-         np.ones((num_bbox * 8, 1))], axis=-1)
+    pts_4d = np.concatenate([corners_3d.reshape(-1, 3), np.ones((num_bbox * 8, 1))], axis=-1)
     lidar2img_rt = copy.deepcopy(lidar2img_rt).reshape(4, 4)
     if isinstance(lidar2img_rt, torch.Tensor):
         lidar2img_rt = lidar2img_rt.cpu().numpy()
@@ -269,12 +276,7 @@ def draw_lidar_bbox3d_on_img(bboxes3d,
 
 
 # TODO: remove third parameter in all functions here in favour of img_metas
-def draw_depth_bbox3d_on_img(bboxes3d,
-                             raw_img,
-                             calibs,
-                             img_metas,
-                             color=(0, 255, 0),
-                             thickness=1):
+def draw_depth_bbox3d_on_img(bboxes3d, raw_img, calibs, img_metas, color=(0, 255, 0), thickness=1):
     """Project the 3D bbox on 2D plane and draw on input image.
 
     Args:
@@ -297,24 +299,19 @@ def draw_depth_bbox3d_on_img(bboxes3d,
     points_3d = corners_3d.reshape(-1, 3)
 
     # first reverse the data transformations
-    xyz_depth = apply_3d_transformation(
-        points_3d, 'DEPTH', img_metas, reverse=True)
+    xyz_depth = apply_3d_transformation(points_3d, "DEPTH", img_metas, reverse=True)
 
     # project to 2d to get image coords (uv)
-    uv_origin = points_cam2img(xyz_depth,
-                               xyz_depth.new_tensor(img_metas['depth2img']))
+    uv_origin = points_cam2img(xyz_depth, xyz_depth.new_tensor(img_metas["depth2img"]))
     uv_origin = (uv_origin - 1).round()
     imgfov_pts_2d = uv_origin[..., :2].reshape(num_bbox, 8, 2).numpy()
 
     return plot_rect3d_on_img(img, num_bbox, imgfov_pts_2d, color, thickness)
 
 
-def draw_camera_bbox3d_on_img(bboxes3d,
-                              raw_img,
-                              cam2img,
-                              img_metas,
-                              color=(0, 255, 0),
-                              thickness=1):
+def draw_camera_bbox3d_on_img(
+    bboxes3d, raw_img, cam2img, img_metas, color=(0, 255, 0), thickness=1
+):
     """Project the 3D bbox on 2D plane and draw on input image.
 
     Args:
@@ -338,8 +335,7 @@ def draw_camera_bbox3d_on_img(bboxes3d,
     if not isinstance(cam2img, torch.Tensor):
         cam2img = torch.from_numpy(np.array(cam2img))
 
-    assert (cam2img.shape == torch.Size([3, 3])
-            or cam2img.shape == torch.Size([4, 4]))
+    assert cam2img.shape == torch.Size([3, 3]) or cam2img.shape == torch.Size([4, 4])
     cam2img = cam2img.float().cpu()
 
     # project to 2d to get image coords (uv)

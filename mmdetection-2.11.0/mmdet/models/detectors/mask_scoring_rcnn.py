@@ -9,14 +9,9 @@ class MaskScoringRCNN(TwoStageDetector):
     https://arxiv.org/abs/1903.00241
     """
 
-    def __init__(self,
-                 backbone,
-                 rpn_head,
-                 roi_head,
-                 train_cfg,
-                 test_cfg,
-                 neck=None,
-                 pretrained=None):
+    def __init__(
+        self, backbone, rpn_head, roi_head, train_cfg, test_cfg, neck=None, pretrained=None
+    ):
         super(MaskScoringRCNN, self).__init__(
             backbone=backbone,
             neck=neck,
@@ -24,4 +19,5 @@ class MaskScoringRCNN(TwoStageDetector):
             roi_head=roi_head,
             train_cfg=train_cfg,
             test_cfg=test_cfg,
-            pretrained=pretrained)
+            pretrained=pretrained,
+        )

@@ -27,20 +27,19 @@ class SparseUNet(nn.Module):
         decoder_paddings (tuple[tuple[int]]): Paddings of each decode block.
     """
 
-    def __init__(self,
-                 in_channels,
-                 sparse_shape,
-                 order=('conv', 'norm', 'act'),
-                 norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
-                 base_channels=16,
-                 output_channels=128,
-                 encoder_channels=((16, ), (32, 32, 32), (64, 64, 64), (64, 64,
-                                                                        64)),
-                 encoder_paddings=((1, ), (1, 1, 1), (1, 1, 1), ((0, 1, 1), 1,
-                                                                 1)),
-                 decoder_channels=((64, 64, 64), (64, 64, 32), (32, 32, 16),
-                                   (16, 16, 16)),
-                 decoder_paddings=((1, 0), (1, 0), (0, 0), (0, 1))):
+    def __init__(
+        self,
+        in_channels,
+        sparse_shape,
+        order=("conv", "norm", "act"),
+        norm_cfg=dict(type="BN1d", eps=1e-3, momentum=0.01),
+        base_channels=16,
+        output_channels=128,
+        encoder_channels=((16,), (32, 32, 32), (64, 64, 64), (64, 64, 64)),
+        encoder_paddings=((1,), (1, 1, 1), (1, 1, 1), ((0, 1, 1), 1, 1)),
+        decoder_channels=((64, 64, 64), (64, 64, 32), (32, 32, 16), (16, 16, 16)),
+        decoder_paddings=((1, 0), (1, 0), (0, 0), (0, 1)),
+    ):
         super().__init__()
         self.sparse_shape = sparse_shape
         self.in_channels = in_channels
@@ -56,18 +55,19 @@ class SparseUNet(nn.Module):
         # Spconv init all weight on its own
 
         assert isinstance(order, tuple) and len(order) == 3
-        assert set(order) == {'conv', 'norm', 'act'}
+        assert set(order) == {"conv", "norm", "act"}
 
-        if self.order[0] != 'conv':  # pre activate
+        if self.order[0] != "conv":  # pre activate
             self.conv_input = make_sparse_convmodule(
                 in_channels,
                 self.base_channels,
                 3,
                 norm_cfg=norm_cfg,
                 padding=1,
-                indice_key='subm1',
-                conv_type='SubMConv3d',
-                order=('conv', ))
+                indice_key="subm1",
+                conv_type="SubMConv3d",
+                order=("conv",),
+            )
         else:  # post activate
             self.conv_input = make_sparse_convmodule(
                 in_channels,
@@ -75,13 +75,14 @@ class SparseUNet(nn.Module):
                 3,
                 norm_cfg=norm_cfg,
                 padding=1,
-                indice_key='subm1',
-                conv_type='SubMConv3d')
+                indice_key="subm1",
+                conv_type="SubMConv3d",
+            )
 
         encoder_out_channels = self.make_encoder_layers(
-            make_sparse_convmodule, norm_cfg, self.base_channels)
-        self.make_decoder_layers(make_sparse_convmodule, norm_cfg,
-                                 encoder_out_channels)
+            make_sparse_convmodule, norm_cfg, self.base_channels
+        )
+        self.make_decoder_layers(make_sparse_convmodule, norm_cfg, encoder_out_channels)
 
         self.conv_out = make_sparse_convmodule(
             encoder_out_channels,
@@ -90,10 +91,11 @@ class SparseUNet(nn.Module):
             stride=(2, 1, 1),
             norm_cfg=norm_cfg,
             padding=0,
-            indice_key='spconv_down2',
-            conv_type='SparseConv3d')
+            indice_key="spconv_down2",
+            conv_type="SparseConv3d",
+        )
 
-    @auto_fp16(apply_to=('voxel_features', ))
+    @auto_fp16(apply_to=("voxel_features",))
     def forward(self, voxel_features, coors, batch_size):
         """Forward of SparseUNet.
 
@@ -107,9 +109,9 @@ class SparseUNet(nn.Module):
             dict[str, torch.Tensor]: Backbone features.
         """
         coors = coors.int()
-        input_sp_tensor = spconv.SparseConvTensor(voxel_features, coors,
-                                                  self.sparse_shape,
-                                                  batch_size)
+        input_sp_tensor = spconv.SparseConvTensor(
+            voxel_features, coors, self.sparse_shape, batch_size
+        )
         x = self.conv_input(input_sp_tensor)
 
         encode_features = []
@@ -133,21 +135,24 @@ class SparseUNet(nn.Module):
         decode_features = []
         x = encode_features[-1]
         for i in range(self.stage_num, 0, -1):
-            x = self.decoder_layer_forward(encode_features[i - 1], x,
-                                           getattr(self, f'lateral_layer{i}'),
-                                           getattr(self, f'merge_layer{i}'),
-                                           getattr(self, f'upsample_layer{i}'))
+            x = self.decoder_layer_forward(
+                encode_features[i - 1],
+                x,
+                getattr(self, f"lateral_layer{i}"),
+                getattr(self, f"merge_layer{i}"),
+                getattr(self, f"upsample_layer{i}"),
+            )
             decode_features.append(x)
 
         seg_features = decode_features[-1].features
 
-        ret = dict(
-            spatial_features=spatial_features, seg_features=seg_features)
+        ret = dict(spatial_features=spatial_features, seg_features=seg_features)
 
         return ret
 
-    def decoder_layer_forward(self, x_lateral, x_bottom, lateral_layer,
-                              merge_layer, upsample_layer):
+    def decoder_layer_forward(
+        self, x_lateral, x_bottom, lateral_layer, merge_layer, upsample_layer
+    ):
         """Forward of upsample and residual block.
 
         Args:
@@ -182,8 +187,7 @@ class SparseUNet(nn.Module):
         """
         features = x.features
         n, in_channels = features.shape
-        assert (in_channels % out_channels
-                == 0) and (in_channels >= out_channels)
+        assert (in_channels % out_channels == 0) and (in_channels >= out_channels)
 
         x.features = features.view(n, out_channels, -1).sum(dim=2)
         return x
@@ -216,8 +220,10 @@ class SparseUNet(nn.Module):
                             norm_cfg=norm_cfg,
                             stride=2,
                             padding=padding,
-                            indice_key=f'spconv{i + 1}',
-                            conv_type='SparseConv3d'))
+                            indice_key=f"spconv{i + 1}",
+                            conv_type="SparseConv3d",
+                        )
+                    )
                 else:
                     blocks_list.append(
                         make_block(
@@ -226,10 +232,12 @@ class SparseUNet(nn.Module):
                             3,
                             norm_cfg=norm_cfg,
                             padding=padding,
-                            indice_key=f'subm{i + 1}',
-                            conv_type='SubMConv3d'))
+                            indice_key=f"subm{i + 1}",
+                            conv_type="SubMConv3d",
+                        )
+                    )
                 in_channels = out_channels
-            stage_name = f'encoder_layer{i + 1}'
+            stage_name = f"encoder_layer{i + 1}"
             stage_layers = spconv.SparseSequential(*blocks_list)
             self.encoder_layers.add_module(stage_name, stage_layers)
         return out_channels
@@ -249,44 +257,55 @@ class SparseUNet(nn.Module):
         for i, block_channels in enumerate(self.decoder_channels):
             paddings = self.decoder_paddings[i]
             setattr(
-                self, f'lateral_layer{block_num - i}',
+                self,
+                f"lateral_layer{block_num - i}",
                 SparseBasicBlock(
                     in_channels,
                     block_channels[0],
-                    conv_cfg=dict(
-                        type='SubMConv3d', indice_key=f'subm{block_num - i}'),
-                    norm_cfg=norm_cfg))
+                    conv_cfg=dict(type="SubMConv3d", indice_key=f"subm{block_num - i}"),
+                    norm_cfg=norm_cfg,
+                ),
+            )
             setattr(
-                self, f'merge_layer{block_num - i}',
+                self,
+                f"merge_layer{block_num - i}",
                 make_block(
                     in_channels * 2,
                     block_channels[1],
                     3,
                     norm_cfg=norm_cfg,
                     padding=paddings[0],
-                    indice_key=f'subm{block_num - i}',
-                    conv_type='SubMConv3d'))
+                    indice_key=f"subm{block_num - i}",
+                    conv_type="SubMConv3d",
+                ),
+            )
             if block_num - i != 1:
                 setattr(
-                    self, f'upsample_layer{block_num - i}',
+                    self,
+                    f"upsample_layer{block_num - i}",
                     make_block(
                         in_channels,
                         block_channels[2],
                         3,
                         norm_cfg=norm_cfg,
-                        indice_key=f'spconv{block_num - i}',
-                        conv_type='SparseInverseConv3d'))
+                        indice_key=f"spconv{block_num - i}",
+                        conv_type="SparseInverseConv3d",
+                    ),
+                )
             else:
                 # use submanifold conv instead of inverse conv
                 # in the last block
                 setattr(
-                    self, f'upsample_layer{block_num - i}',
+                    self,
+                    f"upsample_layer{block_num - i}",
                     make_block(
                         in_channels,
                         block_channels[2],
                         3,
                         norm_cfg=norm_cfg,
                         padding=paddings[1],
-                        indice_key='subm1',
-                        conv_type='SubMConv3d'))
+                        indice_key="subm1",
+                        conv_type="SubMConv3d",
+                    ),
+                )
             in_channels = block_channels[2]

@@ -25,22 +25,24 @@ def merge_aug_bboxes_3d(aug_results, img_metas, test_cfg):
             - labels_3d (torch.Tensor): Merged predicted box labels.
     """
 
-    assert len(aug_results) == len(img_metas), \
-        '"aug_results" should have the same length as "img_metas", got len(' \
-        f'aug_results)={len(aug_results)} and len(img_metas)={len(img_metas)}'
+    assert len(aug_results) == len(img_metas), (
+        '"aug_results" should have the same length as "img_metas", got len('
+        f"aug_results)={len(aug_results)} and len(img_metas)={len(img_metas)}"
+    )
 
     recovered_bboxes = []
     recovered_scores = []
     recovered_labels = []
 
     for bboxes, img_info in zip(aug_results, img_metas):
-        scale_factor = img_info[0]['pcd_scale_factor']
-        pcd_horizontal_flip = img_info[0]['pcd_horizontal_flip']
-        pcd_vertical_flip = img_info[0]['pcd_vertical_flip']
-        recovered_scores.append(bboxes['scores_3d'])
-        recovered_labels.append(bboxes['labels_3d'])
-        bboxes = bbox3d_mapping_back(bboxes['boxes_3d'], scale_factor,
-                                     pcd_horizontal_flip, pcd_vertical_flip)
+        scale_factor = img_info[0]["pcd_scale_factor"]
+        pcd_horizontal_flip = img_info[0]["pcd_horizontal_flip"]
+        pcd_vertical_flip = img_info[0]["pcd_vertical_flip"]
+        recovered_scores.append(bboxes["scores_3d"])
+        recovered_labels.append(bboxes["labels_3d"])
+        bboxes = bbox3d_mapping_back(
+            bboxes["boxes_3d"], scale_factor, pcd_horizontal_flip, pcd_vertical_flip
+        )
         recovered_bboxes.append(bboxes)
 
     aug_bboxes = recovered_bboxes[0].cat(recovered_bboxes)
@@ -63,7 +65,7 @@ def merge_aug_bboxes_3d(aug_results, img_metas, test_cfg):
         return bbox3d2result(aug_bboxes, aug_scores, aug_labels)
 
     for class_id in range(torch.max(aug_labels).item() + 1):
-        class_inds = (aug_labels == class_id)
+        class_inds = aug_labels == class_id
         bboxes_i = aug_bboxes[class_inds]
         bboxes_nms_i = aug_bboxes_for_nms[class_inds, :]
         scores_i = aug_scores[class_inds]

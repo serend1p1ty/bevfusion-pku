@@ -11,16 +11,15 @@ def test_hourglass_backbone():
 
     with pytest.raises(AssertionError):
         # len(stage_channels) should equal len(stage_blocks)
-        HourglassNet(
-            stage_channels=[256, 256, 384, 384, 384],
-            stage_blocks=[2, 2, 2, 2, 2, 4])
+        HourglassNet(stage_channels=[256, 256, 384, 384, 384], stage_blocks=[2, 2, 2, 2, 2, 4])
 
     with pytest.raises(AssertionError):
         # len(stage_channels) should lagrer than downsample_times
         HourglassNet(
             downsample_times=5,
             stage_channels=[256, 256, 384, 384, 384],
-            stage_blocks=[2, 2, 2, 2, 2])
+            stage_blocks=[2, 2, 2, 2, 2],
+        )
 
     # Test HourglassNet-52
     model = HourglassNet(num_stacks=1)

@@ -38,25 +38,28 @@ class BaseShapeHead(nn.Module):
         bias (bool|str, optional): Type of bias. Default: False.
     """
 
-    def __init__(self,
-                 num_cls,
-                 num_base_anchors,
-                 box_code_size,
-                 in_channels,
-                 shared_conv_channels=(64, 64),
-                 shared_conv_strides=(1, 1),
-                 use_direction_classifier=True,
-                 conv_cfg=dict(type='Conv2d'),
-                 norm_cfg=dict(type='BN2d'),
-                 bias=False):
+    def __init__(
+        self,
+        num_cls,
+        num_base_anchors,
+        box_code_size,
+        in_channels,
+        shared_conv_channels=(64, 64),
+        shared_conv_strides=(1, 1),
+        use_direction_classifier=True,
+        conv_cfg=dict(type="Conv2d"),
+        norm_cfg=dict(type="BN2d"),
+        bias=False,
+    ):
         super().__init__()
         self.num_cls = num_cls
         self.num_base_anchors = num_base_anchors
         self.use_direction_classifier = use_direction_classifier
         self.box_code_size = box_code_size
 
-        assert len(shared_conv_channels) == len(shared_conv_strides), \
-            'Lengths of channels and strides list should be equal.'
+        assert len(shared_conv_channels) == len(
+            shared_conv_strides
+        ), "Lengths of channels and strides list should be equal."
 
         self.shared_conv_channels = [in_channels] + list(shared_conv_channels)
         self.shared_conv_strides = list(shared_conv_strides)
@@ -72,18 +75,18 @@ class BaseShapeHead(nn.Module):
                     padding=1,
                     conv_cfg=conv_cfg,
                     bias=bias,
-                    norm_cfg=norm_cfg))
+                    norm_cfg=norm_cfg,
+                )
+            )
 
         self.shared_conv = nn.Sequential(*shared_conv)
 
         out_channels = self.shared_conv_channels[-1]
         self.conv_cls = nn.Conv2d(out_channels, num_base_anchors * num_cls, 1)
-        self.conv_reg = nn.Conv2d(out_channels,
-                                  num_base_anchors * box_code_size, 1)
+        self.conv_reg = nn.Conv2d(out_channels, num_base_anchors * box_code_size, 1)
 
         if use_direction_classifier:
-            self.conv_dir_cls = nn.Conv2d(out_channels, num_base_anchors * 2,
-                                          1)
+            self.conv_dir_cls = nn.Conv2d(out_channels, num_base_anchors * 2, 1)
 
     def init_weights(self):
         """Initialize weights."""
@@ -115,25 +118,31 @@ class BaseShapeHead(nn.Module):
         featmap_size = bbox_pred.shape[-2:]
         H, W = featmap_size
         B = bbox_pred.shape[0]
-        cls_score = cls_score.view(-1, self.num_base_anchors, self.num_cls, H,
-                                   W).permute(0, 1, 3, 4,
-                                              2).reshape(B, -1, self.num_cls)
-        bbox_pred = bbox_pred.view(-1, self.num_base_anchors,
-                                   self.box_code_size, H, W).permute(
-                                       0, 1, 3, 4,
-                                       2).reshape(B, -1, self.box_code_size)
+        cls_score = (
+            cls_score.view(-1, self.num_base_anchors, self.num_cls, H, W)
+            .permute(0, 1, 3, 4, 2)
+            .reshape(B, -1, self.num_cls)
+        )
+        bbox_pred = (
+            bbox_pred.view(-1, self.num_base_anchors, self.box_code_size, H, W)
+            .permute(0, 1, 3, 4, 2)
+            .reshape(B, -1, self.box_code_size)
+        )
 
         dir_cls_preds = None
         if self.use_direction_classifier:
             dir_cls_preds = self.conv_dir_cls(x)
-            dir_cls_preds = dir_cls_preds.view(-1, self.num_base_anchors, 2, H,
-                                               W).permute(0, 1, 3, 4,
-                                                          2).reshape(B, -1, 2)
+            dir_cls_preds = (
+                dir_cls_preds.view(-1, self.num_base_anchors, 2, H, W)
+                .permute(0, 1, 3, 4, 2)
+                .reshape(B, -1, 2)
+            )
         ret = dict(
             cls_score=cls_score,
             bbox_pred=bbox_pred,
             dir_cls_preds=dir_cls_preds,
-            featmap_size=featmap_size)
+            featmap_size=featmap_size,
+        )
         return ret
 
 
@@ -159,21 +168,21 @@ class ShapeAwareHead(Anchor3DHead):
         self.heads = nn.ModuleList()
         cls_ptr = 0
         for task in self.tasks:
-            sizes = self.anchor_generator.sizes[cls_ptr:cls_ptr +
-                                                task['num_class']]
+            sizes = self.anchor_generator.sizes[cls_ptr : cls_ptr + task["num_class"]]
             num_size = torch.tensor(sizes).reshape(-1, 3).size(0)
             num_rot = len(self.anchor_generator.rotations)
             num_base_anchors = num_rot * num_size
             branch = dict(
-                type='BaseShapeHead',
+                type="BaseShapeHead",
                 num_cls=self.num_classes,
                 num_base_anchors=num_base_anchors,
                 box_code_size=self.box_code_size,
                 in_channels=self.in_channels,
-                shared_conv_channels=task['shared_conv_channels'],
-                shared_conv_strides=task['shared_conv_strides'])
+                shared_conv_channels=task["shared_conv_channels"],
+                shared_conv_strides=task["shared_conv_strides"],
+            )
             self.heads.append(build_head(branch))
-            cls_ptr += task['num_class']
+            cls_ptr += task["num_class"]
 
     def init_weights(self):
         """Initialize the weights of head."""
@@ -194,28 +203,36 @@ class ShapeAwareHead(Anchor3DHead):
         for head in self.heads:
             results.append(head(x))
 
-        cls_score = torch.cat([result['cls_score'] for result in results],
-                              dim=1)
-        bbox_pred = torch.cat([result['bbox_pred'] for result in results],
-                              dim=1)
+        cls_score = torch.cat([result["cls_score"] for result in results], dim=1)
+        bbox_pred = torch.cat([result["bbox_pred"] for result in results], dim=1)
         dir_cls_preds = None
         if self.use_direction_classifier:
-            dir_cls_preds = torch.cat(
-                [result['dir_cls_preds'] for result in results], dim=1)
+            dir_cls_preds = torch.cat([result["dir_cls_preds"] for result in results], dim=1)
 
         self.featmap_sizes = []
         for i, task in enumerate(self.tasks):
-            for _ in range(task['num_class']):
-                self.featmap_sizes.append(results[i]['featmap_size'])
-        assert len(self.featmap_sizes) == len(self.anchor_generator.ranges), \
-            'Length of feature map sizes must be equal to length of ' + \
-            'different ranges of anchor generator.'
+            for _ in range(task["num_class"]):
+                self.featmap_sizes.append(results[i]["featmap_size"])
+        assert len(self.featmap_sizes) == len(self.anchor_generator.ranges), (
+            "Length of feature map sizes must be equal to length of "
+            + "different ranges of anchor generator."
+        )
 
         return cls_score, bbox_pred, dir_cls_preds
 
-    def loss_single(self, cls_score, bbox_pred, dir_cls_preds, labels,
-                    label_weights, bbox_targets, bbox_weights, dir_targets,
-                    dir_weights, num_total_samples):
+    def loss_single(
+        self,
+        cls_score,
+        bbox_pred,
+        dir_cls_preds,
+        labels,
+        label_weights,
+        bbox_targets,
+        bbox_weights,
+        dir_targets,
+        dir_weights,
+        num_total_samples,
+    ):
         """Calculate loss of Single-level results.
 
         Args:
@@ -241,25 +258,21 @@ class ShapeAwareHead(Anchor3DHead):
         labels = labels.reshape(-1)
         label_weights = label_weights.reshape(-1)
         cls_score = cls_score.reshape(-1, self.num_classes)
-        loss_cls = self.loss_cls(
-            cls_score, labels, label_weights, avg_factor=num_total_samples)
+        loss_cls = self.loss_cls(cls_score, labels, label_weights, avg_factor=num_total_samples)
 
         # regression loss
         bbox_targets = bbox_targets.reshape(-1, self.box_code_size)
         bbox_weights = bbox_weights.reshape(-1, self.box_code_size)
-        code_weight = self.train_cfg.get('code_weight', None)
+        code_weight = self.train_cfg.get("code_weight", None)
 
         if code_weight:
             bbox_weights = bbox_weights * bbox_weights.new_tensor(code_weight)
         bbox_pred = bbox_pred.reshape(-1, self.box_code_size)
         if self.diff_rad_by_sin:
-            bbox_pred, bbox_targets = self.add_sin_difference(
-                bbox_pred, bbox_targets)
+            bbox_pred, bbox_targets = self.add_sin_difference(bbox_pred, bbox_targets)
         loss_bbox = self.loss_bbox(
-            bbox_pred,
-            bbox_targets,
-            bbox_weights,
-            avg_factor=num_total_samples)
+            bbox_pred, bbox_targets, bbox_weights, avg_factor=num_total_samples
+        )
 
         # direction classification loss
         loss_dir = None
@@ -268,21 +281,21 @@ class ShapeAwareHead(Anchor3DHead):
             dir_targets = dir_targets.reshape(-1)
             dir_weights = dir_weights.reshape(-1)
             loss_dir = self.loss_dir(
-                dir_cls_preds,
-                dir_targets,
-                dir_weights,
-                avg_factor=num_total_samples)
+                dir_cls_preds, dir_targets, dir_weights, avg_factor=num_total_samples
+            )
 
         return loss_cls, loss_bbox, loss_dir
 
-    def loss(self,
-             cls_scores,
-             bbox_preds,
-             dir_cls_preds,
-             gt_bboxes,
-             gt_labels,
-             input_metas,
-             gt_bboxes_ignore=None):
+    def loss(
+        self,
+        cls_scores,
+        bbox_preds,
+        dir_cls_preds,
+        gt_bboxes,
+        gt_labels,
+        input_metas,
+        gt_bboxes_ignore=None,
+    ):
         """Calculate losses.
 
         Args:
@@ -307,8 +320,7 @@ class ShapeAwareHead(Anchor3DHead):
                     losses.
         """
         device = cls_scores[0].device
-        anchor_list = self.get_anchors(
-            self.featmap_sizes, input_metas, device=device)
+        anchor_list = self.get_anchors(self.featmap_sizes, input_metas, device=device)
         cls_reg_targets = self.anchor_target_3d(
             anchor_list,
             gt_bboxes,
@@ -316,15 +328,22 @@ class ShapeAwareHead(Anchor3DHead):
             gt_bboxes_ignore_list=gt_bboxes_ignore,
             gt_labels_list=gt_labels,
             num_classes=self.num_classes,
-            sampling=self.sampling)
+            sampling=self.sampling,
+        )
 
         if cls_reg_targets is None:
             return None
-        (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
-         dir_targets_list, dir_weights_list, num_total_pos,
-         num_total_neg) = cls_reg_targets
-        num_total_samples = (
-            num_total_pos + num_total_neg if self.sampling else num_total_pos)
+        (
+            labels_list,
+            label_weights_list,
+            bbox_targets_list,
+            bbox_weights_list,
+            dir_targets_list,
+            dir_weights_list,
+            num_total_pos,
+            num_total_neg,
+        ) = cls_reg_targets
+        num_total_samples = num_total_pos + num_total_neg if self.sampling else num_total_pos
 
         # num_total_samples = None
         losses_cls, losses_bbox, losses_dir = multi_apply(
@@ -338,17 +357,13 @@ class ShapeAwareHead(Anchor3DHead):
             bbox_weights_list,
             dir_targets_list,
             dir_weights_list,
-            num_total_samples=num_total_samples)
-        return dict(
-            loss_cls=losses_cls, loss_bbox=losses_bbox, loss_dir=losses_dir)
+            num_total_samples=num_total_samples,
+        )
+        return dict(loss_cls=losses_cls, loss_bbox=losses_bbox, loss_dir=losses_dir)
 
-    def get_bboxes(self,
-                   cls_scores,
-                   bbox_preds,
-                   dir_cls_preds,
-                   input_metas,
-                   cfg=None,
-                   rescale=False):
+    def get_bboxes(
+        self, cls_scores, bbox_preds, dir_cls_preds, input_metas, cfg=None, rescale=False
+    ):
         """Get bboxes of anchor head.
 
         Args:
@@ -368,40 +383,41 @@ class ShapeAwareHead(Anchor3DHead):
         assert len(cls_scores) == len(bbox_preds)
         assert len(cls_scores) == len(dir_cls_preds)
         num_levels = len(cls_scores)
-        assert num_levels == 1, 'Only support single level inference.'
+        assert num_levels == 1, "Only support single level inference."
         device = cls_scores[0].device
-        mlvl_anchors = self.anchor_generator.grid_anchors(
-            self.featmap_sizes, device=device)
+        mlvl_anchors = self.anchor_generator.grid_anchors(self.featmap_sizes, device=device)
         # `anchor` is a list of anchors for different classes
         mlvl_anchors = [torch.cat(anchor, dim=0) for anchor in mlvl_anchors]
 
         result_list = []
         for img_id in range(len(input_metas)):
-            cls_score_list = [
-                cls_scores[i][img_id].detach() for i in range(num_levels)
-            ]
-            bbox_pred_list = [
-                bbox_preds[i][img_id].detach() for i in range(num_levels)
-            ]
-            dir_cls_pred_list = [
-                dir_cls_preds[i][img_id].detach() for i in range(num_levels)
-            ]
+            cls_score_list = [cls_scores[i][img_id].detach() for i in range(num_levels)]
+            bbox_pred_list = [bbox_preds[i][img_id].detach() for i in range(num_levels)]
+            dir_cls_pred_list = [dir_cls_preds[i][img_id].detach() for i in range(num_levels)]
 
             input_meta = input_metas[img_id]
-            proposals = self.get_bboxes_single(cls_score_list, bbox_pred_list,
-                                               dir_cls_pred_list, mlvl_anchors,
-                                               input_meta, cfg, rescale)
+            proposals = self.get_bboxes_single(
+                cls_score_list,
+                bbox_pred_list,
+                dir_cls_pred_list,
+                mlvl_anchors,
+                input_meta,
+                cfg,
+                rescale,
+            )
             result_list.append(proposals)
         return result_list
 
-    def get_bboxes_single(self,
-                          cls_scores,
-                          bbox_preds,
-                          dir_cls_preds,
-                          mlvl_anchors,
-                          input_meta,
-                          cfg=None,
-                          rescale=False):
+    def get_bboxes_single(
+        self,
+        cls_scores,
+        bbox_preds,
+        dir_cls_preds,
+        mlvl_anchors,
+        input_meta,
+        cfg=None,
+        rescale=False,
+    ):
         """Get bboxes of single branch.
 
         Args:
@@ -429,7 +445,8 @@ class ShapeAwareHead(Anchor3DHead):
         mlvl_scores = []
         mlvl_dir_scores = []
         for cls_score, bbox_pred, dir_cls_pred, anchors in zip(
-                cls_scores, bbox_preds, dir_cls_preds, mlvl_anchors):
+            cls_scores, bbox_preds, dir_cls_preds, mlvl_anchors
+        ):
             assert cls_score.size()[-2] == bbox_pred.size()[-2]
             assert cls_score.size()[-2] == dir_cls_pred.size()[-2]
             dir_cls_score = torch.max(dir_cls_pred, dim=-1)[1]
@@ -439,7 +456,7 @@ class ShapeAwareHead(Anchor3DHead):
             else:
                 scores = cls_score.softmax(-1)
 
-            nms_pre = cfg.get('nms_pre', -1)
+            nms_pre = cfg.get("nms_pre", -1)
             if nms_pre > 0 and scores.shape[0] > nms_pre:
                 if self.use_sigmoid_cls:
                     max_scores, _ = scores.max(dim=1)
@@ -457,8 +474,9 @@ class ShapeAwareHead(Anchor3DHead):
             mlvl_dir_scores.append(dir_cls_score)
 
         mlvl_bboxes = torch.cat(mlvl_bboxes)
-        mlvl_bboxes_for_nms = xywhr2xyxyr(input_meta['box_type_3d'](
-            mlvl_bboxes, box_dim=self.box_code_size).bev)
+        mlvl_bboxes_for_nms = xywhr2xyxyr(
+            input_meta["box_type_3d"](mlvl_bboxes, box_dim=self.box_code_size).bev
+        )
         mlvl_scores = torch.cat(mlvl_scores)
         mlvl_dir_scores = torch.cat(mlvl_dir_scores)
 
@@ -467,16 +485,19 @@ class ShapeAwareHead(Anchor3DHead):
             padding = mlvl_scores.new_zeros(mlvl_scores.shape[0], 1)
             mlvl_scores = torch.cat([mlvl_scores, padding], dim=1)
 
-        score_thr = cfg.get('score_thr', 0)
-        results = box3d_multiclass_nms(mlvl_bboxes, mlvl_bboxes_for_nms,
-                                       mlvl_scores, score_thr, cfg.max_num,
-                                       cfg, mlvl_dir_scores)
+        score_thr = cfg.get("score_thr", 0)
+        results = box3d_multiclass_nms(
+            mlvl_bboxes,
+            mlvl_bboxes_for_nms,
+            mlvl_scores,
+            score_thr,
+            cfg.max_num,
+            cfg,
+            mlvl_dir_scores,
+        )
         bboxes, scores, labels, dir_scores = results
         if bboxes.shape[0] > 0:
-            dir_rot = limit_period(bboxes[..., 6] - self.dir_offset,
-                                   self.dir_limit_offset, np.pi)
-            bboxes[..., 6] = (
-                dir_rot + self.dir_offset +
-                np.pi * dir_scores.to(bboxes.dtype))
-        bboxes = input_meta['box_type_3d'](bboxes, box_dim=self.box_code_size)
+            dir_rot = limit_period(bboxes[..., 6] - self.dir_offset, self.dir_limit_offset, np.pi)
+            bboxes[..., 6] = dir_rot + self.dir_offset + np.pi * dir_scores.to(bboxes.dtype)
+        bboxes = input_meta["box_type_3d"](bboxes, box_dim=self.box_code_size)
         return bboxes, scores, labels

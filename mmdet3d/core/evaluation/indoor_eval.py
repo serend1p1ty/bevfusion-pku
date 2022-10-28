@@ -4,7 +4,7 @@ from mmcv.utils import print_log
 from terminaltables import AsciiTable
 
 
-def average_precision(recalls, precisions, mode='area'):
+def average_precision(recalls, precisions, mode="area"):
     """Calculate average precision (for single or multiple scales).
 
     Args:
@@ -28,7 +28,7 @@ def average_precision(recalls, precisions, mode='area'):
 
     num_scales = recalls.shape[0]
     ap = np.zeros(num_scales, dtype=np.float32)
-    if mode == 'area':
+    if mode == "area":
         zeros = np.zeros((num_scales, 1), dtype=recalls.dtype)
         ones = np.ones((num_scales, 1), dtype=recalls.dtype)
         mrec = np.hstack((zeros, recalls, ones))
@@ -37,9 +37,8 @@ def average_precision(recalls, precisions, mode='area'):
             mpre[:, i - 1] = np.maximum(mpre[:, i - 1], mpre[:, i])
         for i in range(num_scales):
             ind = np.where(mrec[i, 1:] != mrec[i, :-1])[0]
-            ap[i] = np.sum(
-                (mrec[i, ind + 1] - mrec[i, ind]) * mpre[i, ind + 1])
-    elif mode == '11points':
+            ap[i] = np.sum((mrec[i, ind + 1] - mrec[i, ind]) * mpre[i, ind + 1])
+    elif mode == "11points":
         for i in range(num_scales):
             for thr in np.arange(0, 1 + 1e-3, 0.1):
                 precs = precisions[i, recalls[i, :] >= thr]
@@ -47,8 +46,7 @@ def average_precision(recalls, precisions, mode='area'):
                 ap[i] += prec
             ap /= 11
     else:
-        raise ValueError(
-            'Unrecognized mode, only "area" and "11points" are supported')
+        raise ValueError('Unrecognized mode, only "area" and "11points" are supported')
     return ap
 
 
@@ -81,7 +79,7 @@ def eval_det_cls(pred, gt, iou_thr=None):
             bbox = gt[img_id]
         det = [[False] * len(bbox) for i in iou_thr]
         npos += len(bbox)
-        class_recs[img_id] = {'bbox': bbox, 'det': det}
+        class_recs[img_id] = {"bbox": bbox, "det": det}
 
     # construct dets
     image_ids = []
@@ -99,7 +97,7 @@ def eval_det_cls(pred, gt, iou_thr=None):
             pred_cur[box_idx] = box.tensor
             box_idx += 1
         pred_cur = box.new_box(pred_cur)
-        gt_cur = class_recs[img_id]['bbox']
+        gt_cur = class_recs[img_id]["bbox"]
         if len(gt_cur) > 0:
             # calculate iou in each image
             iou_cur = pred_cur.overlaps(pred_cur, gt_cur)
@@ -123,7 +121,7 @@ def eval_det_cls(pred, gt, iou_thr=None):
     for d in range(nd):
         R = class_recs[image_ids[d]]
         iou_max = -np.inf
-        BBGT = R['bbox']
+        BBGT = R["bbox"]
         cur_iou = ious[d]
 
         if len(BBGT) > 0:
@@ -137,13 +135,13 @@ def eval_det_cls(pred, gt, iou_thr=None):
 
         for iou_idx, thresh in enumerate(iou_thr):
             if iou_max > thresh:
-                if not R['det'][iou_idx][jmax]:
-                    tp_thr[iou_idx][d] = 1.
-                    R['det'][iou_idx][jmax] = 1
+                if not R["det"][iou_idx][jmax]:
+                    tp_thr[iou_idx][d] = 1.0
+                    R["det"][iou_idx][jmax] = 1
                 else:
-                    fp_thr[iou_idx][d] = 1.
+                    fp_thr[iou_idx][d] = 1.0
             else:
-                fp_thr[iou_idx][d] = 1.
+                fp_thr[iou_idx][d] = 1.0
 
     ret = []
     for iou_idx, thresh in enumerate(iou_thr):
@@ -181,8 +179,7 @@ def eval_map_recall(pred, gt, ovthresh=None):
     ret_values = {}
     for classname in gt.keys():
         if classname in pred:
-            ret_values[classname] = eval_det_cls(pred[classname],
-                                                 gt[classname], ovthresh)
+            ret_values[classname] = eval_det_cls(pred[classname], gt[classname], ovthresh)
     recall = [{} for i in ovthresh]
     precision = [{} for i in ovthresh]
     ap = [{} for i in ovthresh]
@@ -190,8 +187,9 @@ def eval_map_recall(pred, gt, ovthresh=None):
     for label in gt.keys():
         for iou_idx, thresh in enumerate(ovthresh):
             if label in pred:
-                recall[iou_idx][label], precision[iou_idx][label], ap[iou_idx][
-                    label] = ret_values[label][iou_idx]
+                recall[iou_idx][label], precision[iou_idx][label], ap[iou_idx][label] = ret_values[
+                    label
+                ][iou_idx]
             else:
                 recall[iou_idx][label] = np.zeros(1)
                 precision[iou_idx][label] = np.zeros(1)
@@ -200,13 +198,9 @@ def eval_map_recall(pred, gt, ovthresh=None):
     return recall, precision, ap
 
 
-def indoor_eval(gt_annos,
-                dt_annos,
-                metric,
-                label2cat,
-                logger=None,
-                box_type_3d=None,
-                box_mode_3d=None):
+def indoor_eval(
+    gt_annos, dt_annos, metric, label2cat, logger=None, box_type_3d=None, box_mode_3d=None
+):
     """Indoor Evaluation.
 
     Evaluate the result of the detection.
@@ -234,10 +228,10 @@ def indoor_eval(gt_annos,
     for img_id in range(len(dt_annos)):
         # parse detected annotations
         det_anno = dt_annos[img_id]
-        for i in range(len(det_anno['labels_3d'])):
-            label = det_anno['labels_3d'].numpy()[i]
-            bbox = det_anno['boxes_3d'].convert_to(box_mode_3d)[i]
-            score = det_anno['scores_3d'].numpy()[i]
+        for i in range(len(det_anno["labels_3d"])):
+            label = det_anno["labels_3d"].numpy()[i]
+            bbox = det_anno["boxes_3d"].convert_to(box_mode_3d)[i]
+            score = det_anno["scores_3d"].numpy()[i]
             if label not in pred:
                 pred[int(label)] = {}
             if img_id not in pred[label]:
@@ -250,12 +244,13 @@ def indoor_eval(gt_annos,
 
         # parse gt annotations
         gt_anno = gt_annos[img_id]
-        if gt_anno['gt_num'] != 0:
+        if gt_anno["gt_num"] != 0:
             gt_boxes = box_type_3d(
-                gt_anno['gt_boxes_upright_depth'],
-                box_dim=gt_anno['gt_boxes_upright_depth'].shape[-1],
-                origin=(0.5, 0.5, 0.5)).convert_to(box_mode_3d)
-            labels_3d = gt_anno['class']
+                gt_anno["gt_boxes_upright_depth"],
+                box_dim=gt_anno["gt_boxes_upright_depth"].shape[-1],
+                origin=(0.5, 0.5, 0.5),
+            ).convert_to(box_mode_3d)
+            labels_3d = gt_anno["class"]
         else:
             gt_boxes = box_type_3d(np.array([], dtype=np.float32))
             labels_3d = np.array([], dtype=np.int64)
@@ -271,39 +266,35 @@ def indoor_eval(gt_annos,
 
     rec, prec, ap = eval_map_recall(pred, gt, metric)
     ret_dict = dict()
-    header = ['classes']
-    table_columns = [[label2cat[label]
-                      for label in ap[0].keys()] + ['Overall']]
+    header = ["classes"]
+    table_columns = [[label2cat[label] for label in ap[0].keys()] + ["Overall"]]
 
     for i, iou_thresh in enumerate(metric):
-        header.append(f'AP_{iou_thresh:.2f}')
-        header.append(f'AR_{iou_thresh:.2f}')
+        header.append(f"AP_{iou_thresh:.2f}")
+        header.append(f"AR_{iou_thresh:.2f}")
         rec_list = []
         for label in ap[i].keys():
-            ret_dict[f'{label2cat[label]}_AP_{iou_thresh:.2f}'] = float(
-                ap[i][label][0])
-        ret_dict[f'mAP_{iou_thresh:.2f}'] = float(
-            np.mean(list(ap[i].values())))
+            ret_dict[f"{label2cat[label]}_AP_{iou_thresh:.2f}"] = float(ap[i][label][0])
+        ret_dict[f"mAP_{iou_thresh:.2f}"] = float(np.mean(list(ap[i].values())))
 
         table_columns.append(list(map(float, list(ap[i].values()))))
-        table_columns[-1] += [ret_dict[f'mAP_{iou_thresh:.2f}']]
-        table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+        table_columns[-1] += [ret_dict[f"mAP_{iou_thresh:.2f}"]]
+        table_columns[-1] = [f"{x:.4f}" for x in table_columns[-1]]
 
         for label in rec[i].keys():
-            ret_dict[f'{label2cat[label]}_rec_{iou_thresh:.2f}'] = float(
-                rec[i][label][-1])
+            ret_dict[f"{label2cat[label]}_rec_{iou_thresh:.2f}"] = float(rec[i][label][-1])
             rec_list.append(rec[i][label][-1])
-        ret_dict[f'mAR_{iou_thresh:.2f}'] = float(np.mean(rec_list))
+        ret_dict[f"mAR_{iou_thresh:.2f}"] = float(np.mean(rec_list))
 
         table_columns.append(list(map(float, rec_list)))
-        table_columns[-1] += [ret_dict[f'mAR_{iou_thresh:.2f}']]
-        table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+        table_columns[-1] += [ret_dict[f"mAR_{iou_thresh:.2f}"]]
+        table_columns[-1] = [f"{x:.4f}" for x in table_columns[-1]]
 
     table_data = [header]
     table_rows = list(zip(*table_columns))
     table_data += table_rows
     table = AsciiTable(table_data)
     table.inner_footing_row_border = True
-    print_log('\n' + table.table, logger=logger)
+    print_log("\n" + table.table, logger=logger)
 
     return ret_dict

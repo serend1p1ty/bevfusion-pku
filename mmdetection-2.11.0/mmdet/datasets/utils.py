@@ -56,17 +56,18 @@ def replace_ImageToTensor(pipelines):
     """
     pipelines = copy.deepcopy(pipelines)
     for i, pipeline in enumerate(pipelines):
-        if pipeline['type'] == 'MultiScaleFlipAug':
-            assert 'transforms' in pipeline
-            pipeline['transforms'] = replace_ImageToTensor(
-                pipeline['transforms'])
-        elif pipeline['type'] == 'ImageToTensor':
+        if pipeline["type"] == "MultiScaleFlipAug":
+            assert "transforms" in pipeline
+            pipeline["transforms"] = replace_ImageToTensor(pipeline["transforms"])
+        elif pipeline["type"] == "ImageToTensor":
             warnings.warn(
                 '"ImageToTensor" pipeline is replaced by '
                 '"DefaultFormatBundle" for batch inference. It is '
-                'recommended to manually replace it in the test '
-                'data pipeline in your config file.', UserWarning)
-            pipelines[i] = {'type': 'DefaultFormatBundle'}
+                "recommended to manually replace it in the test "
+                "data pipeline in your config file.",
+                UserWarning,
+            )
+            pipelines[i] = {"type": "DefaultFormatBundle"}
     return pipelines
 
 
@@ -100,20 +101,19 @@ def get_loading_pipeline(pipeline):
     """
     loading_pipeline_cfg = []
     for cfg in pipeline:
-        obj_cls = PIPELINES.get(cfg['type'])
+        obj_cls = PIPELINES.get(cfg["type"])
         # TODO：use more elegant way to distinguish loading modules
-        if obj_cls is not None and obj_cls in (LoadImageFromFile,
-                                               LoadAnnotations):
+        if obj_cls is not None and obj_cls in (LoadImageFromFile, LoadAnnotations):
             loading_pipeline_cfg.append(cfg)
-    assert len(loading_pipeline_cfg) == 2, \
-        'The data pipeline in your config file must include ' \
-        'loading image and annotations related pipeline.'
+    assert len(loading_pipeline_cfg) == 2, (
+        "The data pipeline in your config file must include "
+        "loading image and annotations related pipeline."
+    )
     return loading_pipeline_cfg
 
 
 @HOOKS.register_module()
 class NumClassCheckHook(Hook):
-
     def _check_head(self, runner):
         """Check whether the `num_classes` in head matches the length of
         `CLASSSES` in `dataset`.
@@ -125,21 +125,24 @@ class NumClassCheckHook(Hook):
         dataset = runner.data_loader.dataset
         if dataset.CLASSES is None:
             runner.logger.warning(
-                f'Please set `CLASSES` '
-                f'in the {dataset.__class__.__name__} and'
-                f'check if it is consistent with the `num_classes` '
-                f'of head')
+                f"Please set `CLASSES` "
+                f"in the {dataset.__class__.__name__} and"
+                f"check if it is consistent with the `num_classes` "
+                f"of head"
+            )
         else:
             for name, module in model.named_modules():
-                if hasattr(module, 'num_classes') and not isinstance(
-                        module, (RPNHead, VGG, FusedSemanticHead, GARPNHead)):
-                    assert module.num_classes == len(dataset.CLASSES), \
-                        (f'The `num_classes` ({module.num_classes}) in '
-                         f'{module.__class__.__name__} of '
-                         f'{model.__class__.__name__} does not matches '
-                         f'the length of `CLASSES` '
-                         f'{len(dataset.CLASSES)}) in '
-                         f'{dataset.__class__.__name__}')
+                if hasattr(module, "num_classes") and not isinstance(
+                    module, (RPNHead, VGG, FusedSemanticHead, GARPNHead)
+                ):
+                    assert module.num_classes == len(dataset.CLASSES), (
+                        f"The `num_classes` ({module.num_classes}) in "
+                        f"{module.__class__.__name__} of "
+                        f"{model.__class__.__name__} does not matches "
+                        f"the length of `CLASSES` "
+                        f"{len(dataset.CLASSES)}) in "
+                        f"{dataset.__class__.__name__}"
+                    )
 
     def before_train_epoch(self, runner):
         """Check whether the training dataset is compatible with head.

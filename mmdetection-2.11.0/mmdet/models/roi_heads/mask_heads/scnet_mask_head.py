@@ -24,4 +24,5 @@ class SCNetMaskHead(FCNMaskHead):
                 self.conv_out_channels,
                 self.num_res_blocks,
                 conv_cfg=self.conv_cfg,
-                norm_cfg=self.norm_cfg)
+                norm_cfg=self.norm_cfg,
+            )

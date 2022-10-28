@@ -71,6 +71,6 @@ class SCNetBBoxHead(ConvFCBBoxHead):
         out = self._forward_cls_reg(x_shared)
 
         if return_shared_feat:
-            out += (x_shared, )
+            out += (x_shared,)
 
         return out

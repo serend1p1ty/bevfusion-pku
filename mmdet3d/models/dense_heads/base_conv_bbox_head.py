@@ -17,19 +17,21 @@ class BaseConvBboxHead(nn.Module):
                      \-> reg convs -> bbox_pred
     """
 
-    def __init__(self,
-                 in_channels=0,
-                 shared_conv_channels=(),
-                 cls_conv_channels=(),
-                 num_cls_out_channels=0,
-                 reg_conv_channels=(),
-                 num_reg_out_channels=0,
-                 conv_cfg=dict(type='Conv1d'),
-                 norm_cfg=dict(type='BN1d'),
-                 act_cfg=dict(type='ReLU'),
-                 bias='auto',
-                 *args,
-                 **kwargs):
+    def __init__(
+        self,
+        in_channels=0,
+        shared_conv_channels=(),
+        cls_conv_channels=(),
+        num_cls_out_channels=0,
+        reg_conv_channels=(),
+        num_reg_out_channels=0,
+        conv_cfg=dict(type="Conv1d"),
+        norm_cfg=dict(type="BN1d"),
+        act_cfg=dict(type="ReLU"),
+        bias="auto",
+        *args,
+        **kwargs,
+    ):
         super(BaseConvBboxHead, self).__init__(*args, **kwargs)
         assert in_channels > 0
         assert num_cls_out_channels > 0
@@ -47,8 +49,7 @@ class BaseConvBboxHead(nn.Module):
 
         # add shared convs
         if len(self.shared_conv_channels) > 0:
-            self.shared_convs = self._add_conv_branch(
-                self.in_channels, self.shared_conv_channels)
+            self.shared_convs = self._add_conv_branch(self.in_channels, self.shared_conv_channels)
             out_channels = self.shared_conv_channels[-1]
         else:
             out_channels = self.in_channels
@@ -56,27 +57,21 @@ class BaseConvBboxHead(nn.Module):
         # add cls specific branch
         prev_channel = out_channels
         if len(self.cls_conv_channels) > 0:
-            self.cls_convs = self._add_conv_branch(prev_channel,
-                                                   self.cls_conv_channels)
+            self.cls_convs = self._add_conv_branch(prev_channel, self.cls_conv_channels)
             prev_channel = self.cls_conv_channels[-1]
 
         self.conv_cls = build_conv_layer(
-            conv_cfg,
-            in_channels=prev_channel,
-            out_channels=num_cls_out_channels,
-            kernel_size=1)
+            conv_cfg, in_channels=prev_channel, out_channels=num_cls_out_channels, kernel_size=1
+        )
         # add reg specific branch
         prev_channel = out_channels
         if len(self.reg_conv_channels) > 0:
-            self.reg_convs = self._add_conv_branch(prev_channel,
-                                                   self.reg_conv_channels)
+            self.reg_convs = self._add_conv_branch(prev_channel, self.reg_conv_channels)
             prev_channel = self.reg_conv_channels[-1]
 
         self.conv_reg = build_conv_layer(
-            conv_cfg,
-            in_channels=prev_channel,
-            out_channels=num_reg_out_channels,
-            kernel_size=1)
+            conv_cfg, in_channels=prev_channel, out_channels=num_reg_out_channels, kernel_size=1
+        )
 
     def _add_conv_branch(self, in_channels, conv_channels):
         """Add shared or separable branch."""
@@ -85,7 +80,7 @@ class BaseConvBboxHead(nn.Module):
         conv_layers = nn.Sequential()
         for i in range(len(conv_spec) - 1):
             conv_layers.add_module(
-                f'layer{i}',
+                f"layer{i}",
                 ConvModule(
                     conv_spec[i],
                     conv_spec[i + 1],
@@ -95,7 +90,9 @@ class BaseConvBboxHead(nn.Module):
                     norm_cfg=self.norm_cfg,
                     act_cfg=self.act_cfg,
                     bias=self.bias,
-                    inplace=True))
+                    inplace=True,
+                ),
+            )
         return conv_layers
 
     def init_weights(self):

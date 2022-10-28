@@ -1,3 +1,3 @@
 from mmcv.utils import Registry
 
-OBJECTSAMPLERS = Registry('Object sampler')
+OBJECTSAMPLERS = Registry("Object sampler")

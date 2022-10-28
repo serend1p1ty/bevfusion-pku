@@ -29,15 +29,17 @@ class QueryAndGroup(nn.Module):
             Default: False.
     """
 
-    def __init__(self,
-                 max_radius,
-                 sample_num,
-                 min_radius=0,
-                 use_xyz=True,
-                 return_grouped_xyz=False,
-                 normalize_xyz=False,
-                 uniform_sample=False,
-                 return_unique_cnt=False):
+    def __init__(
+        self,
+        max_radius,
+        sample_num,
+        min_radius=0,
+        use_xyz=True,
+        return_grouped_xyz=False,
+        normalize_xyz=False,
+        uniform_sample=False,
+        return_unique_cnt=False,
+    ):
         super(QueryAndGroup, self).__init__()
         self.max_radius = max_radius
         self.min_radius = min_radius
@@ -61,8 +63,7 @@ class QueryAndGroup(nn.Module):
         Return：
             Tensor: (B, 3 + C, npoint, sample_num) Grouped feature.
         """
-        idx = ball_query(self.min_radius, self.max_radius, self.sample_num,
-                         points_xyz, center_xyz)
+        idx = ball_query(self.min_radius, self.max_radius, self.sample_num, points_xyz, center_xyz)
 
         if self.uniform_sample:
             unique_cnt = torch.zeros((idx.shape[0], idx.shape[1]))
@@ -72,9 +73,8 @@ class QueryAndGroup(nn.Module):
                     num_unique = unique_ind.shape[0]
                     unique_cnt[i_batch, i_region] = num_unique
                     sample_ind = torch.randint(
-                        0,
-                        num_unique, (self.sample_num - num_unique, ),
-                        dtype=torch.long)
+                        0, num_unique, (self.sample_num - num_unique,), dtype=torch.long
+                    )
                     all_ind = torch.cat((unique_ind, unique_ind[sample_ind]))
                     idx[i_batch, i_region, :] = all_ind
 
@@ -89,13 +89,11 @@ class QueryAndGroup(nn.Module):
             grouped_features = grouping_operation(features, idx)
             if self.use_xyz:
                 # (B, C + 3, npoint, sample_num)
-                new_features = torch.cat([grouped_xyz, grouped_features],
-                                         dim=1)
+                new_features = torch.cat([grouped_xyz, grouped_features], dim=1)
             else:
                 new_features = grouped_features
         else:
-            assert (self.use_xyz
-                    ), 'Cannot have not features and not use xyz as a feature!'
+            assert self.use_xyz, "Cannot have not features and not use xyz as a feature!"
             new_features = grouped_xyz
 
         ret = [new_features]
@@ -122,10 +120,7 @@ class GroupAll(nn.Module):
         super().__init__()
         self.use_xyz = use_xyz
 
-    def forward(self,
-                xyz: torch.Tensor,
-                new_xyz: torch.Tensor,
-                features: torch.Tensor = None):
+    def forward(self, xyz: torch.Tensor, new_xyz: torch.Tensor, features: torch.Tensor = None):
         """forward.
 
         Args:
@@ -140,8 +135,7 @@ class GroupAll(nn.Module):
         if features is not None:
             grouped_features = features.unsqueeze(2)
             if self.use_xyz:
-                new_features = torch.cat([grouped_xyz, grouped_features],
-                                         dim=1)  # (B, 3 + C, 1, N)
+                new_features = torch.cat([grouped_xyz, grouped_features], dim=1)  # (B, 3 + C, 1, N)
             else:
                 new_features = grouped_features
         else:
@@ -157,8 +151,7 @@ class GroupingOperation(Function):
     """
 
     @staticmethod
-    def forward(ctx, features: torch.Tensor,
-                indices: torch.Tensor) -> torch.Tensor:
+    def forward(ctx, features: torch.Tensor, indices: torch.Tensor) -> torch.Tensor:
         """forward.
 
         Args:
@@ -176,15 +169,13 @@ class GroupingOperation(Function):
         _, C, N = features.size()
         output = torch.cuda.FloatTensor(B, C, nfeatures, nsample)
 
-        group_points_ext.forward(B, C, N, nfeatures, nsample, features,
-                                 indices, output)
+        group_points_ext.forward(B, C, N, nfeatures, nsample, features, indices, output)
 
         ctx.for_backwards = (indices, N)
         return output
 
     @staticmethod
-    def backward(ctx,
-                 grad_out: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def backward(ctx, grad_out: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """backward.
 
         Args:
@@ -200,8 +191,7 @@ class GroupingOperation(Function):
         grad_features = torch.cuda.FloatTensor(B, C, N).zero_()
 
         grad_out_data = grad_out.data.contiguous()
-        group_points_ext.backward(B, C, N, npoint, nsample, grad_out_data, idx,
-                                  grad_features.data)
+        group_points_ext.backward(B, C, N, npoint, nsample, grad_out_data, idx, grad_features.data)
         return grad_features, None
 
 

@@ -24,15 +24,17 @@ class GlobalContextHead(nn.Module):
             1 `SimplifiedBasicBlock` using a skip connection. Default: False.
     """
 
-    def __init__(self,
-                 num_convs=4,
-                 in_channels=256,
-                 conv_out_channels=256,
-                 num_classes=80,
-                 loss_weight=1.0,
-                 conv_cfg=None,
-                 norm_cfg=None,
-                 conv_to_res=False):
+    def __init__(
+        self,
+        num_convs=4,
+        in_channels=256,
+        conv_out_channels=256,
+        num_classes=80,
+        loss_weight=1.0,
+        conv_cfg=None,
+        norm_cfg=None,
+        conv_to_res=False,
+    ):
         super(GlobalContextHead, self).__init__()
         self.num_convs = num_convs
         self.in_channels = in_channels
@@ -52,7 +54,8 @@ class GlobalContextHead(nn.Module):
                 self.conv_out_channels,
                 num_res_blocks,
                 conv_cfg=self.conv_cfg,
-                norm_cfg=self.norm_cfg)
+                norm_cfg=self.norm_cfg,
+            )
             self.num_convs = num_res_blocks
         else:
             self.convs = nn.ModuleList()
@@ -65,7 +68,9 @@ class GlobalContextHead(nn.Module):
                         3,
                         padding=1,
                         conv_cfg=self.conv_cfg,
-                        norm_cfg=self.norm_cfg))
+                        norm_cfg=self.norm_cfg,
+                    )
+                )
 
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Linear(conv_out_channels, num_classes)
@@ -91,7 +96,7 @@ class GlobalContextHead(nn.Module):
 
         return mc_pred, x
 
-    @force_fp32(apply_to=('pred', ))
+    @force_fp32(apply_to=("pred",))
     def loss(self, pred, labels):
         """Loss function."""
         labels = [lbl.unique() for lbl in labels]

@@ -1,8 +1,7 @@
 import copy
 
 import torch.nn as nn
-from mmcv.cnn import (ConvModule, Scale, bias_init_with_prob,
-                      caffe2_xavier_init, normal_init)
+from mmcv.cnn import ConvModule, Scale, bias_init_with_prob, caffe2_xavier_init, normal_init
 
 from mmdet.models.dense_heads.fcos_head import FCOSHead
 from ..builder import HEADS
@@ -20,26 +19,21 @@ class NASFCOSHead(FCOSHead):
     def _init_layers(self):
         """Initialize layers of the head."""
         dconv3x3_config = dict(
-            type='DCNv2',
-            kernel_size=3,
-            use_bias=True,
-            deform_groups=2,
-            padding=1)
-        conv3x3_config = dict(type='Conv', kernel_size=3, padding=1)
-        conv1x1_config = dict(type='Conv', kernel_size=1)
+            type="DCNv2", kernel_size=3, use_bias=True, deform_groups=2, padding=1
+        )
+        conv3x3_config = dict(type="Conv", kernel_size=3, padding=1)
+        conv1x1_config = dict(type="Conv", kernel_size=1)
 
-        self.arch_config = [
-            dconv3x3_config, conv3x3_config, dconv3x3_config, conv1x1_config
-        ]
+        self.arch_config = [dconv3x3_config, conv3x3_config, dconv3x3_config, conv1x1_config]
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
         for i, op_ in enumerate(self.arch_config):
             op = copy.deepcopy(op_)
             chn = self.in_channels if i == 0 else self.feat_channels
             assert isinstance(op, dict)
-            use_bias = op.pop('use_bias', False)
-            padding = op.pop('padding', 0)
-            kernel_size = op.pop('kernel_size')
+            use_bias = op.pop("use_bias", False)
+            padding = op.pop("padding", 0)
+            kernel_size = op.pop("kernel_size")
             module = ConvModule(
                 chn,
                 self.feat_channels,
@@ -48,13 +42,13 @@ class NASFCOSHead(FCOSHead):
                 padding=padding,
                 norm_cfg=self.norm_cfg,
                 bias=use_bias,
-                conv_cfg=op)
+                conv_cfg=op,
+            )
 
             self.cls_convs.append(copy.deepcopy(module))
             self.reg_convs.append(copy.deepcopy(module))
 
-        self.conv_cls = nn.Conv2d(
-            self.feat_channels, self.cls_out_channels, 3, padding=1)
+        self.conv_cls = nn.Conv2d(self.feat_channels, self.cls_out_channels, 3, padding=1)
         self.conv_reg = nn.Conv2d(self.feat_channels, 4, 3, padding=1)
         self.conv_centerness = nn.Conv2d(self.feat_channels, 1, 3, padding=1)
 
@@ -70,6 +64,5 @@ class NASFCOSHead(FCOSHead):
 
         for branch in [self.cls_convs, self.reg_convs]:
             for module in branch.modules():
-                if isinstance(module, ConvModule) \
-                        and isinstance(module.conv, nn.Conv2d):
+                if isinstance(module, ConvModule) and isinstance(module.conv, nn.Conv2d):
                     caffe2_xavier_init(module.conv)

@@ -4,10 +4,14 @@ from mmcv.cnn import bias_init_with_prob, normal_init
 from mmcv.runner import force_fp32
 from torch import nn as nn
 
-from mmdet3d.core import (PseudoSampler, box3d_multiclass_nms, limit_period,
-                          xywhr2xyxyr)
-from mmdet.core import (build_anchor_generator, build_assigner,
-                        build_bbox_coder, build_sampler, multi_apply)
+from mmdet3d.core import PseudoSampler, box3d_multiclass_nms, limit_period, xywhr2xyxyr
+from mmdet.core import (
+    build_anchor_generator,
+    build_assigner,
+    build_bbox_coder,
+    build_sampler,
+    multi_apply,
+)
 from mmdet.models import HEADS
 from ..builder import build_loss
 from .train_mixins import AnchorTrainMixin
@@ -40,34 +44,33 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
         loss_dir (dict): Config of direction classifier loss.
     """
 
-    def __init__(self,
-                 num_classes,
-                 in_channels,
-                 train_cfg,
-                 test_cfg,
-                 feat_channels=256,
-                 use_direction_classifier=True,
-                 anchor_generator=dict(
-                     type='Anchor3DRangeGenerator',
-                     range=[0, -39.68, -1.78, 69.12, 39.68, -1.78],
-                     strides=[2],
-                     sizes=[[1.6, 3.9, 1.56]],
-                     rotations=[0, 1.57],
-                     custom_values=[],
-                     reshape_out=False),
-                 assigner_per_size=False,
-                 assign_per_class=False,
-                 diff_rad_by_sin=True,
-                 dir_offset=0,
-                 dir_limit_offset=1,
-                 bbox_coder=dict(type='DeltaXYZWLHRBBoxCoder'),
-                 loss_cls=dict(
-                     type='CrossEntropyLoss',
-                     use_sigmoid=True,
-                     loss_weight=1.0),
-                 loss_bbox=dict(
-                     type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=2.0),
-                 loss_dir=dict(type='CrossEntropyLoss', loss_weight=0.2)):
+    def __init__(
+        self,
+        num_classes,
+        in_channels,
+        train_cfg,
+        test_cfg,
+        feat_channels=256,
+        use_direction_classifier=True,
+        anchor_generator=dict(
+            type="Anchor3DRangeGenerator",
+            range=[0, -39.68, -1.78, 69.12, 39.68, -1.78],
+            strides=[2],
+            sizes=[[1.6, 3.9, 1.56]],
+            rotations=[0, 1.57],
+            custom_values=[],
+            reshape_out=False,
+        ),
+        assigner_per_size=False,
+        assign_per_class=False,
+        diff_rad_by_sin=True,
+        dir_offset=0,
+        dir_limit_offset=1,
+        bbox_coder=dict(type="DeltaXYZWLHRBBoxCoder"),
+        loss_cls=dict(type="CrossEntropyLoss", use_sigmoid=True, loss_weight=1.0),
+        loss_bbox=dict(type="SmoothL1Loss", beta=1.0 / 9.0, loss_weight=2.0),
+        loss_dir=dict(type="CrossEntropyLoss", loss_weight=0.2),
+    ):
         super().__init__()
         self.in_channels = in_channels
         self.num_classes = num_classes
@@ -91,8 +94,8 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
         self.box_code_size = self.bbox_coder.code_size
 
         # build loss function
-        self.use_sigmoid_cls = loss_cls.get('use_sigmoid', False)
-        self.sampling = loss_cls['type'] not in ['FocalLoss', 'GHMC']
+        self.use_sigmoid_cls = loss_cls.get("use_sigmoid", False)
+        self.sampling = loss_cls["type"] not in ["FocalLoss", "GHMC"]
         if not self.use_sigmoid_cls:
             self.num_classes += 1
         self.loss_cls = build_loss(loss_cls)
@@ -115,19 +118,15 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
         if isinstance(self.train_cfg.assigner, dict):
             self.bbox_assigner = build_assigner(self.train_cfg.assigner)
         elif isinstance(self.train_cfg.assigner, list):
-            self.bbox_assigner = [
-                build_assigner(res) for res in self.train_cfg.assigner
-            ]
+            self.bbox_assigner = [build_assigner(res) for res in self.train_cfg.assigner]
 
     def _init_layers(self):
         """Initialize neural network layers of the head."""
         self.cls_out_channels = self.num_anchors * self.num_classes
         self.conv_cls = nn.Conv2d(self.feat_channels, self.cls_out_channels, 1)
-        self.conv_reg = nn.Conv2d(self.feat_channels,
-                                  self.num_anchors * self.box_code_size, 1)
+        self.conv_reg = nn.Conv2d(self.feat_channels, self.num_anchors * self.box_code_size, 1)
         if self.use_direction_classifier:
-            self.conv_dir_cls = nn.Conv2d(self.feat_channels,
-                                          self.num_anchors * 2, 1)
+            self.conv_dir_cls = nn.Conv2d(self.feat_channels, self.num_anchors * 2, 1)
 
     def init_weights(self):
         """Initialize the weights of head."""
@@ -168,7 +167,7 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
         #     img_feats = [None]
         # return multi_apply(self.forward_single, feats, img_feats, [img_metas])
 
-    def get_anchors(self, featmap_sizes, input_metas, device='cuda'):
+    def get_anchors(self, featmap_sizes, input_metas, device="cuda"):
         """Get anchors according to feature map sizes.
 
         Args:
@@ -183,14 +182,23 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
         num_imgs = len(input_metas)
         # since feature map sizes of all images are the same, we only compute
         # anchors for one time
-        multi_level_anchors = self.anchor_generator.grid_anchors(
-            featmap_sizes, device=device)
+        multi_level_anchors = self.anchor_generator.grid_anchors(featmap_sizes, device=device)
         anchor_list = [multi_level_anchors for _ in range(num_imgs)]
         return anchor_list
 
-    def loss_single(self, cls_score, bbox_pred, dir_cls_preds, labels,
-                    label_weights, bbox_targets, bbox_weights, dir_targets,
-                    dir_weights, num_total_samples):
+    def loss_single(
+        self,
+        cls_score,
+        bbox_pred,
+        dir_cls_preds,
+        labels,
+        label_weights,
+        bbox_targets,
+        bbox_weights,
+        dir_targets,
+        dir_weights,
+        num_total_samples,
+    ):
         """Calculate loss of Single-level results.
 
         Args:
@@ -217,19 +225,15 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
         label_weights = label_weights.reshape(-1)
         cls_score = cls_score.permute(0, 2, 3, 1).reshape(-1, self.num_classes)
         assert labels.max().item() <= self.num_classes
-        loss_cls = self.loss_cls(
-            cls_score, labels, label_weights, avg_factor=num_total_samples)
+        loss_cls = self.loss_cls(cls_score, labels, label_weights, avg_factor=num_total_samples)
 
         # regression loss
-        bbox_pred = bbox_pred.permute(0, 2, 3,
-                                      1).reshape(-1, self.box_code_size)
+        bbox_pred = bbox_pred.permute(0, 2, 3, 1).reshape(-1, self.box_code_size)
         bbox_targets = bbox_targets.reshape(-1, self.box_code_size)
         bbox_weights = bbox_weights.reshape(-1, self.box_code_size)
 
         bg_class_ind = self.num_classes
-        pos_inds = ((labels >= 0)
-                    & (labels < bg_class_ind)).nonzero(
-                        as_tuple=False).reshape(-1)
+        pos_inds = ((labels >= 0) & (labels < bg_class_ind)).nonzero(as_tuple=False).reshape(-1)
         num_pos = len(pos_inds)
 
         pos_bbox_pred = bbox_pred[pos_inds]
@@ -246,18 +250,16 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
             pos_dir_weights = dir_weights[pos_inds]
 
         if num_pos > 0:
-            code_weight = self.train_cfg.get('code_weight', None)
+            code_weight = self.train_cfg.get("code_weight", None)
             if code_weight:
-                pos_bbox_weights = pos_bbox_weights * bbox_weights.new_tensor(
-                    code_weight)
+                pos_bbox_weights = pos_bbox_weights * bbox_weights.new_tensor(code_weight)
             if self.diff_rad_by_sin:
                 pos_bbox_pred, pos_bbox_targets = self.add_sin_difference(
-                    pos_bbox_pred, pos_bbox_targets)
+                    pos_bbox_pred, pos_bbox_targets
+                )
             loss_bbox = self.loss_bbox(
-                pos_bbox_pred,
-                pos_bbox_targets,
-                pos_bbox_weights,
-                avg_factor=num_total_samples)
+                pos_bbox_pred, pos_bbox_targets, pos_bbox_weights, avg_factor=num_total_samples
+            )
 
             # direction classification loss
             loss_dir = None
@@ -266,7 +268,8 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
                     pos_dir_cls_preds,
                     pos_dir_targets,
                     pos_dir_weights,
-                    avg_factor=num_total_samples)
+                    avg_factor=num_total_samples,
+                )
         else:
             loss_bbox = pos_bbox_pred.sum()
             if self.use_direction_classifier:
@@ -288,25 +291,23 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
             tuple[torch.Tensor]: ``boxes1`` and ``boxes2`` whose 7th \
                 dimensions are changed.
         """
-        rad_pred_encoding = torch.sin(boxes1[..., 6:7]) * torch.cos(
-            boxes2[..., 6:7])
-        rad_tg_encoding = torch.cos(boxes1[..., 6:7]) * torch.sin(boxes2[...,
-                                                                         6:7])
-        boxes1 = torch.cat(
-            [boxes1[..., :6], rad_pred_encoding, boxes1[..., 7:]], dim=-1)
-        boxes2 = torch.cat([boxes2[..., :6], rad_tg_encoding, boxes2[..., 7:]],
-                           dim=-1)
+        rad_pred_encoding = torch.sin(boxes1[..., 6:7]) * torch.cos(boxes2[..., 6:7])
+        rad_tg_encoding = torch.cos(boxes1[..., 6:7]) * torch.sin(boxes2[..., 6:7])
+        boxes1 = torch.cat([boxes1[..., :6], rad_pred_encoding, boxes1[..., 7:]], dim=-1)
+        boxes2 = torch.cat([boxes2[..., :6], rad_tg_encoding, boxes2[..., 7:]], dim=-1)
         return boxes1, boxes2
 
-    @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'dir_cls_preds'))
-    def loss(self,
-             cls_scores,
-             bbox_preds,
-             dir_cls_preds,
-             gt_bboxes,
-             gt_labels,
-             input_metas,
-             gt_bboxes_ignore=None):
+    @force_fp32(apply_to=("cls_scores", "bbox_preds", "dir_cls_preds"))
+    def loss(
+        self,
+        cls_scores,
+        bbox_preds,
+        dir_cls_preds,
+        gt_bboxes,
+        gt_labels,
+        input_metas,
+        gt_bboxes_ignore=None,
+    ):
         """Calculate losses.
 
         Args:
@@ -333,8 +334,7 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         assert len(featmap_sizes) == self.anchor_generator.num_levels
         device = cls_scores[0].device
-        anchor_list = self.get_anchors(
-            featmap_sizes, input_metas, device=device)
+        anchor_list = self.get_anchors(featmap_sizes, input_metas, device=device)
         label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1
         cls_reg_targets = self.anchor_target_3d(
             anchor_list,
@@ -344,15 +344,22 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
             gt_labels_list=gt_labels,
             num_classes=self.num_classes,
             label_channels=label_channels,
-            sampling=self.sampling)
+            sampling=self.sampling,
+        )
 
         if cls_reg_targets is None:
             return None
-        (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
-         dir_targets_list, dir_weights_list, num_total_pos,
-         num_total_neg) = cls_reg_targets
-        num_total_samples = (
-            num_total_pos + num_total_neg if self.sampling else num_total_pos)
+        (
+            labels_list,
+            label_weights_list,
+            bbox_targets_list,
+            bbox_weights_list,
+            dir_targets_list,
+            dir_weights_list,
+            num_total_pos,
+            num_total_neg,
+        ) = cls_reg_targets
+        num_total_samples = num_total_pos + num_total_neg if self.sampling else num_total_pos
 
         # num_total_samples = None
         losses_cls, losses_bbox, losses_dir = multi_apply(
@@ -366,17 +373,13 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
             bbox_weights_list,
             dir_targets_list,
             dir_weights_list,
-            num_total_samples=num_total_samples)
-        return dict(
-            loss_cls=losses_cls, loss_bbox=losses_bbox, loss_dir=losses_dir)
+            num_total_samples=num_total_samples,
+        )
+        return dict(loss_cls=losses_cls, loss_bbox=losses_bbox, loss_dir=losses_dir)
 
-    def get_bboxes(self,
-                   cls_scores,
-                   bbox_preds,
-                   dir_cls_preds,
-                   input_metas,
-                   cfg=None,
-                   rescale=False):
+    def get_bboxes(
+        self, cls_scores, bbox_preds, dir_cls_preds, input_metas, cfg=None, rescale=False
+    ):
         """Get bboxes of anchor head.
 
         Args:
@@ -396,39 +399,38 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
         num_levels = len(cls_scores)
         featmap_sizes = [cls_scores[i].shape[-2:] for i in range(num_levels)]
         device = cls_scores[0].device
-        mlvl_anchors = self.anchor_generator.grid_anchors(
-            featmap_sizes, device=device)
-        mlvl_anchors = [
-            anchor.reshape(-1, self.box_code_size) for anchor in mlvl_anchors
-        ]
+        mlvl_anchors = self.anchor_generator.grid_anchors(featmap_sizes, device=device)
+        mlvl_anchors = [anchor.reshape(-1, self.box_code_size) for anchor in mlvl_anchors]
 
         result_list = []
         for img_id in range(len(input_metas)):
-            cls_score_list = [
-                cls_scores[i][img_id].detach() for i in range(num_levels)
-            ]
-            bbox_pred_list = [
-                bbox_preds[i][img_id].detach() for i in range(num_levels)
-            ]
-            dir_cls_pred_list = [
-                dir_cls_preds[i][img_id].detach() for i in range(num_levels)
-            ]
+            cls_score_list = [cls_scores[i][img_id].detach() for i in range(num_levels)]
+            bbox_pred_list = [bbox_preds[i][img_id].detach() for i in range(num_levels)]
+            dir_cls_pred_list = [dir_cls_preds[i][img_id].detach() for i in range(num_levels)]
 
             input_meta = input_metas[img_id]
-            proposals = self.get_bboxes_single(cls_score_list, bbox_pred_list,
-                                               dir_cls_pred_list, mlvl_anchors,
-                                               input_meta, cfg, rescale)
+            proposals = self.get_bboxes_single(
+                cls_score_list,
+                bbox_pred_list,
+                dir_cls_pred_list,
+                mlvl_anchors,
+                input_meta,
+                cfg,
+                rescale,
+            )
             result_list.append(proposals)
         return result_list
 
-    def get_bboxes_single(self,
-                          cls_scores,
-                          bbox_preds,
-                          dir_cls_preds,
-                          mlvl_anchors,
-                          input_meta,
-                          cfg=None,
-                          rescale=False):
+    def get_bboxes_single(
+        self,
+        cls_scores,
+        bbox_preds,
+        dir_cls_preds,
+        mlvl_anchors,
+        input_meta,
+        cfg=None,
+        rescale=False,
+    ):
         """Get bboxes of single branch.
 
         Args:
@@ -455,22 +457,21 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
         mlvl_scores = []
         mlvl_dir_scores = []
         for cls_score, bbox_pred, dir_cls_pred, anchors in zip(
-                cls_scores, bbox_preds, dir_cls_preds, mlvl_anchors):
+            cls_scores, bbox_preds, dir_cls_preds, mlvl_anchors
+        ):
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
             assert cls_score.size()[-2:] == dir_cls_pred.size()[-2:]
             dir_cls_pred = dir_cls_pred.permute(1, 2, 0).reshape(-1, 2)
             dir_cls_score = torch.max(dir_cls_pred, dim=-1)[1]
 
-            cls_score = cls_score.permute(1, 2,
-                                          0).reshape(-1, self.num_classes)
+            cls_score = cls_score.permute(1, 2, 0).reshape(-1, self.num_classes)
             if self.use_sigmoid_cls:
                 scores = cls_score.sigmoid()
             else:
                 scores = cls_score.softmax(-1)
-            bbox_pred = bbox_pred.permute(1, 2,
-                                          0).reshape(-1, self.box_code_size)
+            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, self.box_code_size)
 
-            nms_pre = cfg.get('nms_pre', -1)
+            nms_pre = cfg.get("nms_pre", -1)
             if nms_pre > 0 and scores.shape[0] > nms_pre:
                 if self.use_sigmoid_cls:
                     max_scores, _ = scores.max(dim=1)
@@ -488,8 +489,9 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
             mlvl_dir_scores.append(dir_cls_score)
 
         mlvl_bboxes = torch.cat(mlvl_bboxes)
-        mlvl_bboxes_for_nms = xywhr2xyxyr(input_meta['box_type_3d'](
-            mlvl_bboxes, box_dim=self.box_code_size).bev)
+        mlvl_bboxes_for_nms = xywhr2xyxyr(
+            input_meta["box_type_3d"](mlvl_bboxes, box_dim=self.box_code_size).bev
+        )
         mlvl_scores = torch.cat(mlvl_scores)
         mlvl_dir_scores = torch.cat(mlvl_dir_scores)
 
@@ -498,16 +500,19 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
             padding = mlvl_scores.new_zeros(mlvl_scores.shape[0], 1)
             mlvl_scores = torch.cat([mlvl_scores, padding], dim=1)
 
-        score_thr = cfg.get('score_thr', 0)
-        results = box3d_multiclass_nms(mlvl_bboxes, mlvl_bboxes_for_nms,
-                                       mlvl_scores, score_thr, cfg.max_num,
-                                       cfg, mlvl_dir_scores)
+        score_thr = cfg.get("score_thr", 0)
+        results = box3d_multiclass_nms(
+            mlvl_bboxes,
+            mlvl_bboxes_for_nms,
+            mlvl_scores,
+            score_thr,
+            cfg.max_num,
+            cfg,
+            mlvl_dir_scores,
+        )
         bboxes, scores, labels, dir_scores = results
         if bboxes.shape[0] > 0:
-            dir_rot = limit_period(bboxes[..., 6] - self.dir_offset,
-                                   self.dir_limit_offset, np.pi)
-            bboxes[..., 6] = (
-                dir_rot + self.dir_offset +
-                np.pi * dir_scores.to(bboxes.dtype))
-        bboxes = input_meta['box_type_3d'](bboxes, box_dim=self.box_code_size)
+            dir_rot = limit_period(bboxes[..., 6] - self.dir_offset, self.dir_limit_offset, np.pi)
+            bboxes[..., 6] = dir_rot + self.dir_offset + np.pi * dir_scores.to(bboxes.dtype)
+        bboxes = input_meta["box_type_3d"](bboxes, box_dim=self.box_code_size)
         return bboxes, scores, labels

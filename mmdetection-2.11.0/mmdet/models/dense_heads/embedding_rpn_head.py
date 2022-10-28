@@ -19,10 +19,7 @@ class EmbeddingRPNHead(nn.Module):
             init_proposal_feature. Defaults to 256.
     """
 
-    def __init__(self,
-                 num_proposals=100,
-                 proposal_feature_channel=256,
-                 **kwargs):
+    def __init__(self, num_proposals=100, proposal_feature_channel=256, **kwargs):
         super(EmbeddingRPNHead, self).__init__()
         self.num_proposals = num_proposals
         self.proposal_feature_channel = proposal_feature_channel
@@ -32,7 +29,8 @@ class EmbeddingRPNHead(nn.Module):
         """Initialize a sparse set of proposal boxes and proposal features."""
         self.init_proposal_bboxes = nn.Embedding(self.num_proposals, 4)
         self.init_proposal_features = nn.Embedding(
-            self.num_proposals, self.proposal_feature_channel)
+            self.num_proposals, self.proposal_feature_channel
+        )
 
     def init_weights(self):
         """Initialize the init_proposal_bboxes as normalized.
@@ -69,7 +67,7 @@ class EmbeddingRPNHead(nn.Module):
         num_imgs = len(imgs[0])
         imgs_whwh = []
         for meta in img_metas:
-            h, w, _ = meta['img_shape']
+            h, w, _ = meta["img_shape"]
             imgs_whwh.append(imgs[0].new_tensor([[w, h, w, h]]))
         imgs_whwh = torch.cat(imgs_whwh, dim=0)
         imgs_whwh = imgs_whwh[:, None, :]
@@ -81,7 +79,8 @@ class EmbeddingRPNHead(nn.Module):
 
         init_proposal_features = self.init_proposal_features.weight.clone()
         init_proposal_features = init_proposal_features[None].expand(
-            num_imgs, *init_proposal_features.size())
+            num_imgs, *init_proposal_features.size()
+        )
         return proposals, init_proposal_features, imgs_whwh
 
     def forward_dummy(self, img, img_metas):

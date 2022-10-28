@@ -7,12 +7,9 @@ from torch.autograd.function import Function
 
 
 class AllReduce(Function):
-
     @staticmethod
     def forward(ctx, input):
-        input_list = [
-            torch.zeros_like(input) for k in range(dist.get_world_size())
-        ]
+        input_list = [torch.zeros_like(input) for k in range(dist.get_world_size())]
         # Use allgather instead of allreduce in-place operations is unreliable
         dist.all_gather(input_list, input, async_op=False)
         inputs = torch.stack(input_list, dim=0)
@@ -24,8 +21,7 @@ class AllReduce(Function):
         return grad_output
 
 
-
-@NORM_LAYERS.register_module('naiveSyncBN1d')
+@NORM_LAYERS.register_module("naiveSyncBN1d")
 class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
     """Syncronized Batch Normalization for 3D Tensors.
 
@@ -53,11 +49,10 @@ class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
     # TODO: make mmcv fp16 utils handle customized norm layers
     @force_fp32(out_fp16=True)
     def forward(self, input):
-        assert input.dtype == torch.float32, \
-            f'input should be in float32 type, got {input.dtype}'
+        assert input.dtype == torch.float32, f"input should be in float32 type, got {input.dtype}"
         if not dist.is_initialized() or dist.get_world_size() == 1 or not self.training:
             return super().forward(input)
-        assert input.shape[0] > 0, 'SyncBN does not support empty inputs'
+        assert input.shape[0] > 0, "SyncBN does not support empty inputs"
         dim_2 = input.dim() == 2
         if dim_2:
             input.unsqueeze_(2)
@@ -71,8 +66,7 @@ class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
 
         mean, meansqr = torch.split(vec, C)
         var = meansqr - mean * mean
-        self.running_mean += self.momentum * (
-            mean.detach() - self.running_mean)
+        self.running_mean += self.momentum * (mean.detach() - self.running_mean)
         self.running_var += self.momentum * (var.detach() - self.running_var)
 
         invstd = torch.rsqrt(var + self.eps)
@@ -86,7 +80,7 @@ class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
         return input
 
 
-@NORM_LAYERS.register_module('naiveSyncBN2d')
+@NORM_LAYERS.register_module("naiveSyncBN2d")
 class NaiveSyncBatchNorm2d(nn.BatchNorm2d):
     """Syncronized Batch Normalization for 4D Tensors.
 
@@ -114,14 +108,13 @@ class NaiveSyncBatchNorm2d(nn.BatchNorm2d):
     # TODO: make mmcv fp16 utils handle customized norm layers
     @force_fp32(out_fp16=True)
     def forward(self, input):
-        assert input.dtype == torch.float32, \
-            f'input should be in float32 type, got {input.dtype}'
+        assert input.dtype == torch.float32, f"input should be in float32 type, got {input.dtype}"
         if not dist.is_initialized() or dist.get_world_size() == 1 or not self.training:
             return super().forward(input)
         # if dist.get_world_size() == 1 or not self.training:
         #     return super().forward(input)
 
-        assert input.shape[0] > 0, 'SyncBN does not support empty inputs'
+        assert input.shape[0] > 0, "SyncBN does not support empty inputs"
         C = input.shape[1]
         mean = torch.mean(input, dim=[0, 2, 3])
         meansqr = torch.mean(input * input, dim=[0, 2, 3])
@@ -131,8 +124,7 @@ class NaiveSyncBatchNorm2d(nn.BatchNorm2d):
 
         mean, meansqr = torch.split(vec, C)
         var = meansqr - mean * mean
-        self.running_mean += self.momentum * (
-            mean.detach() - self.running_mean)
+        self.running_mean += self.momentum * (mean.detach() - self.running_mean)
         self.running_var += self.momentum * (var.detach() - self.running_var)
 
         invstd = torch.rsqrt(var + self.eps)
@@ -142,7 +134,8 @@ class NaiveSyncBatchNorm2d(nn.BatchNorm2d):
         bias = bias.reshape(1, -1, 1, 1)
         return input * scale + bias
 
-@NORM_LAYERS.register_module('naiveSyncBN3d')
+
+@NORM_LAYERS.register_module("naiveSyncBN3d")
 class NaiveSyncBatchNorm3d(nn.BatchNorm3d):
     """Syncronized Batch Normalization for 5D Tensors.
 
@@ -170,14 +163,13 @@ class NaiveSyncBatchNorm3d(nn.BatchNorm3d):
     # TODO: make mmcv fp16 utils handle customized norm layers
     @force_fp32(out_fp16=True)
     def forward(self, input):
-        assert input.dtype == torch.float32, \
-            f'input should be in float32 type, got {input.dtype}'
+        assert input.dtype == torch.float32, f"input should be in float32 type, got {input.dtype}"
         if not dist.is_initialized() or dist.get_world_size() == 1 or not self.training:
             return super().forward(input)
         # if dist.get_world_size() == 1 or not self.training:
         #     return super().forward(input)
 
-        assert input.shape[0] > 0, 'SyncBN does not support empty inputs'
+        assert input.shape[0] > 0, "SyncBN does not support empty inputs"
         C = input.shape[1]
         mean = torch.mean(input, dim=[0, 2, 3, 4])
         meansqr = torch.mean(input * input, dim=[0, 2, 3, 4])
@@ -187,8 +179,7 @@ class NaiveSyncBatchNorm3d(nn.BatchNorm3d):
 
         mean, meansqr = torch.split(vec, C)
         var = meansqr - mean * mean
-        self.running_mean += self.momentum * (
-            mean.detach() - self.running_mean)
+        self.running_mean += self.momentum * (mean.detach() - self.running_mean)
         self.running_var += self.momentum * (var.detach() - self.running_var)
 
         invstd = torch.rsqrt(var + self.eps)

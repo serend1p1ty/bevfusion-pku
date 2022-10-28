@@ -48,49 +48,63 @@ class PartA2RPNHead(Anchor3DHead):
         loss_dir (dict): Config of direction classifier loss.
     """
 
-    def __init__(self,
-                 num_classes,
-                 in_channels,
-                 train_cfg,
-                 test_cfg,
-                 feat_channels=256,
-                 use_direction_classifier=True,
-                 anchor_generator=dict(
-                     type='Anchor3DRangeGenerator',
-                     range=[0, -39.68, -1.78, 69.12, 39.68, -1.78],
-                     strides=[2],
-                     sizes=[[1.6, 3.9, 1.56]],
-                     rotations=[0, 1.57],
-                     custom_values=[],
-                     reshape_out=False),
-                 assigner_per_size=False,
-                 assign_per_class=False,
-                 diff_rad_by_sin=True,
-                 dir_offset=0,
-                 dir_limit_offset=1,
-                 bbox_coder=dict(type='DeltaXYZWLHRBBoxCoder'),
-                 loss_cls=dict(
-                     type='CrossEntropyLoss',
-                     use_sigmoid=True,
-                     loss_weight=1.0),
-                 loss_bbox=dict(
-                     type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=2.0),
-                 loss_dir=dict(type='CrossEntropyLoss', loss_weight=0.2)):
-        super().__init__(num_classes, in_channels, train_cfg, test_cfg,
-                         feat_channels, use_direction_classifier,
-                         anchor_generator, assigner_per_size, assign_per_class,
-                         diff_rad_by_sin, dir_offset, dir_limit_offset,
-                         bbox_coder, loss_cls, loss_bbox, loss_dir)
+    def __init__(
+        self,
+        num_classes,
+        in_channels,
+        train_cfg,
+        test_cfg,
+        feat_channels=256,
+        use_direction_classifier=True,
+        anchor_generator=dict(
+            type="Anchor3DRangeGenerator",
+            range=[0, -39.68, -1.78, 69.12, 39.68, -1.78],
+            strides=[2],
+            sizes=[[1.6, 3.9, 1.56]],
+            rotations=[0, 1.57],
+            custom_values=[],
+            reshape_out=False,
+        ),
+        assigner_per_size=False,
+        assign_per_class=False,
+        diff_rad_by_sin=True,
+        dir_offset=0,
+        dir_limit_offset=1,
+        bbox_coder=dict(type="DeltaXYZWLHRBBoxCoder"),
+        loss_cls=dict(type="CrossEntropyLoss", use_sigmoid=True, loss_weight=1.0),
+        loss_bbox=dict(type="SmoothL1Loss", beta=1.0 / 9.0, loss_weight=2.0),
+        loss_dir=dict(type="CrossEntropyLoss", loss_weight=0.2),
+    ):
+        super().__init__(
+            num_classes,
+            in_channels,
+            train_cfg,
+            test_cfg,
+            feat_channels,
+            use_direction_classifier,
+            anchor_generator,
+            assigner_per_size,
+            assign_per_class,
+            diff_rad_by_sin,
+            dir_offset,
+            dir_limit_offset,
+            bbox_coder,
+            loss_cls,
+            loss_bbox,
+            loss_dir,
+        )
 
-    @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'dir_cls_preds'))
-    def loss(self,
-             cls_scores,
-             bbox_preds,
-             dir_cls_preds,
-             gt_bboxes,
-             gt_labels,
-             input_metas,
-             gt_bboxes_ignore=None):
+    @force_fp32(apply_to=("cls_scores", "bbox_preds", "dir_cls_preds"))
+    def loss(
+        self,
+        cls_scores,
+        bbox_preds,
+        dir_cls_preds,
+        gt_bboxes,
+        gt_labels,
+        input_metas,
+        gt_bboxes_ignore=None,
+    ):
         """Calculate losses.
 
         Args:
@@ -114,23 +128,25 @@ class PartA2RPNHead(Anchor3DHead):
                 - loss_rpn_dir (list[torch.Tensor]): Direction classification \
                     losses.
         """
-        loss_dict = super().loss(cls_scores, bbox_preds, dir_cls_preds,
-                                 gt_bboxes, gt_labels, input_metas,
-                                 gt_bboxes_ignore)
+        loss_dict = super().loss(
+            cls_scores,
+            bbox_preds,
+            dir_cls_preds,
+            gt_bboxes,
+            gt_labels,
+            input_metas,
+            gt_bboxes_ignore,
+        )
         # change the loss key names to avoid conflict
         return dict(
-            loss_rpn_cls=loss_dict['loss_cls'],
-            loss_rpn_bbox=loss_dict['loss_bbox'],
-            loss_rpn_dir=loss_dict['loss_dir'])
+            loss_rpn_cls=loss_dict["loss_cls"],
+            loss_rpn_bbox=loss_dict["loss_bbox"],
+            loss_rpn_dir=loss_dict["loss_dir"],
+        )
 
-    def get_bboxes_single(self,
-                          cls_scores,
-                          bbox_preds,
-                          dir_cls_preds,
-                          mlvl_anchors,
-                          input_meta,
-                          cfg,
-                          rescale=False):
+    def get_bboxes_single(
+        self, cls_scores, bbox_preds, dir_cls_preds, mlvl_anchors, input_meta, cfg, rescale=False
+    ):
         """Get bboxes of single branch.
 
         Args:
@@ -159,23 +175,22 @@ class PartA2RPNHead(Anchor3DHead):
         mlvl_dir_scores = []
         mlvl_cls_score = []
         for cls_score, bbox_pred, dir_cls_pred, anchors in zip(
-                cls_scores, bbox_preds, dir_cls_preds, mlvl_anchors):
+            cls_scores, bbox_preds, dir_cls_preds, mlvl_anchors
+        ):
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
             assert cls_score.size()[-2:] == dir_cls_pred.size()[-2:]
             dir_cls_pred = dir_cls_pred.permute(1, 2, 0).reshape(-1, 2)
             dir_cls_score = torch.max(dir_cls_pred, dim=-1)[1]
 
-            cls_score = cls_score.permute(1, 2,
-                                          0).reshape(-1, self.num_classes)
+            cls_score = cls_score.permute(1, 2, 0).reshape(-1, self.num_classes)
 
             if self.use_sigmoid_cls:
                 scores = cls_score.sigmoid()
             else:
                 scores = cls_score.softmax(-1)
-            bbox_pred = bbox_pred.permute(1, 2,
-                                          0).reshape(-1, self.box_code_size)
+            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, self.box_code_size)
 
-            nms_pre = cfg.get('nms_pre', -1)
+            nms_pre = cfg.get("nms_pre", -1)
             if self.use_sigmoid_cls:
                 max_scores, pred_labels = scores.max(dim=1)
             else:
@@ -198,8 +213,9 @@ class PartA2RPNHead(Anchor3DHead):
             mlvl_dir_scores.append(dir_cls_score)
 
         mlvl_bboxes = torch.cat(mlvl_bboxes)
-        mlvl_bboxes_for_nms = xywhr2xyxyr(input_meta['box_type_3d'](
-            mlvl_bboxes, box_dim=self.box_code_size).bev)
+        mlvl_bboxes_for_nms = xywhr2xyxyr(
+            input_meta["box_type_3d"](mlvl_bboxes, box_dim=self.box_code_size).bev
+        )
         mlvl_max_scores = torch.cat(mlvl_max_scores)
         mlvl_label_pred = torch.cat(mlvl_label_pred)
         mlvl_dir_scores = torch.cat(mlvl_dir_scores)
@@ -210,19 +226,35 @@ class PartA2RPNHead(Anchor3DHead):
         # roi head need this score as classification score
         mlvl_cls_score = torch.cat(mlvl_cls_score)
 
-        score_thr = cfg.get('score_thr', 0)
-        result = self.class_agnostic_nms(mlvl_bboxes, mlvl_bboxes_for_nms,
-                                         mlvl_max_scores, mlvl_label_pred,
-                                         mlvl_cls_score, mlvl_dir_scores,
-                                         score_thr, cfg.nms_post, cfg,
-                                         input_meta)
+        score_thr = cfg.get("score_thr", 0)
+        result = self.class_agnostic_nms(
+            mlvl_bboxes,
+            mlvl_bboxes_for_nms,
+            mlvl_max_scores,
+            mlvl_label_pred,
+            mlvl_cls_score,
+            mlvl_dir_scores,
+            score_thr,
+            cfg.nms_post,
+            cfg,
+            input_meta,
+        )
 
         return result
 
-    def class_agnostic_nms(self, mlvl_bboxes, mlvl_bboxes_for_nms,
-                           mlvl_max_scores, mlvl_label_pred, mlvl_cls_score,
-                           mlvl_dir_scores, score_thr, max_num, cfg,
-                           input_meta):
+    def class_agnostic_nms(
+        self,
+        mlvl_bboxes,
+        mlvl_bboxes_for_nms,
+        mlvl_max_scores,
+        mlvl_label_pred,
+        mlvl_cls_score,
+        mlvl_dir_scores,
+        score_thr,
+        max_num,
+        cfg,
+        input_meta,
+    ):
         """Class agnostic nms for single batch.
 
         Args:
@@ -274,11 +306,12 @@ class PartA2RPNHead(Anchor3DHead):
             labels.append(_mlvl_label_pred[selected])
             cls_scores.append(_mlvl_cls_score[selected])
             dir_scores.append(_mlvl_dir_scores[selected])
-            dir_rot = limit_period(bboxes[-1][..., 6] - self.dir_offset,
-                                   self.dir_limit_offset, np.pi)
+            dir_rot = limit_period(
+                bboxes[-1][..., 6] - self.dir_offset, self.dir_limit_offset, np.pi
+            )
             bboxes[-1][..., 6] = (
-                dir_rot + self.dir_offset +
-                np.pi * dir_scores[-1].to(bboxes[-1].dtype))
+                dir_rot + self.dir_offset + np.pi * dir_scores[-1].to(bboxes[-1].dtype)
+            )
 
         if bboxes:
             bboxes = torch.cat(bboxes, dim=0)
@@ -293,19 +326,19 @@ class PartA2RPNHead(Anchor3DHead):
                 labels = labels[inds]
                 scores = scores[inds]
                 cls_scores = cls_scores[inds]
-            bboxes = input_meta['box_type_3d'](
-                bboxes, box_dim=self.box_code_size)
+            bboxes = input_meta["box_type_3d"](bboxes, box_dim=self.box_code_size)
             return dict(
                 boxes_3d=bboxes,
                 scores_3d=scores,
                 labels_3d=labels,
-                cls_preds=cls_scores  # raw scores [max_num, cls_num]
+                cls_preds=cls_scores,  # raw scores [max_num, cls_num]
             )
         else:
             return dict(
-                boxes_3d=input_meta['box_type_3d'](
-                    mlvl_bboxes.new_zeros([0, self.box_code_size]),
-                    box_dim=self.box_code_size),
+                boxes_3d=input_meta["box_type_3d"](
+                    mlvl_bboxes.new_zeros([0, self.box_code_size]), box_dim=self.box_code_size
+                ),
                 scores_3d=mlvl_bboxes.new_zeros([0]),
                 labels_3d=mlvl_bboxes.new_zeros([0]),
-                cls_preds=mlvl_bboxes.new_zeros([0, mlvl_cls_score.shape[-1]]))
+                cls_preds=mlvl_bboxes.new_zeros([0, mlvl_cls_score.shape[-1]]),
+            )

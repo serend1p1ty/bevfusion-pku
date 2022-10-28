@@ -14,26 +14,25 @@ class BBoxHead(nn.Module):
     """Simplest RoI head, with only two fc layers for classification and
     regression respectively."""
 
-    def __init__(self,
-                 with_avg_pool=False,
-                 with_cls=True,
-                 with_reg=True,
-                 roi_feat_size=7,
-                 in_channels=256,
-                 num_classes=80,
-                 bbox_coder=dict(
-                     type='DeltaXYWHBBoxCoder',
-                     clip_border=True,
-                     target_means=[0., 0., 0., 0.],
-                     target_stds=[0.1, 0.1, 0.2, 0.2]),
-                 reg_class_agnostic=False,
-                 reg_decoded_bbox=False,
-                 loss_cls=dict(
-                     type='CrossEntropyLoss',
-                     use_sigmoid=False,
-                     loss_weight=1.0),
-                 loss_bbox=dict(
-                     type='SmoothL1Loss', beta=1.0, loss_weight=1.0)):
+    def __init__(
+        self,
+        with_avg_pool=False,
+        with_cls=True,
+        with_reg=True,
+        roi_feat_size=7,
+        in_channels=256,
+        num_classes=80,
+        bbox_coder=dict(
+            type="DeltaXYWHBBoxCoder",
+            clip_border=True,
+            target_means=[0.0, 0.0, 0.0, 0.0],
+            target_stds=[0.1, 0.1, 0.2, 0.2],
+        ),
+        reg_class_agnostic=False,
+        reg_decoded_bbox=False,
+        loss_cls=dict(type="CrossEntropyLoss", use_sigmoid=False, loss_weight=1.0),
+        loss_bbox=dict(type="SmoothL1Loss", beta=1.0, loss_weight=1.0),
+    ):
         super(BBoxHead, self).__init__()
         assert with_cls or with_reg
         self.with_avg_pool = with_avg_pool
@@ -82,8 +81,7 @@ class BBoxHead(nn.Module):
         bbox_pred = self.fc_reg(x) if self.with_reg else None
         return cls_score, bbox_pred
 
-    def _get_target_single(self, pos_bboxes, neg_bboxes, pos_gt_bboxes,
-                           pos_gt_labels, cfg):
+    def _get_target_single(self, pos_bboxes, neg_bboxes, pos_gt_bboxes, pos_gt_labels, cfg):
         """Calculate the ground truth for proposals in the single image
         according to the sampling results.
 
@@ -122,9 +120,7 @@ class BBoxHead(nn.Module):
         # original implementation uses new_zeros since BG are set to be 0
         # now use empty & fill because BG cat_id = num_classes,
         # FG cat_id = [0, num_classes-1]
-        labels = pos_bboxes.new_full((num_samples, ),
-                                     self.num_classes,
-                                     dtype=torch.long)
+        labels = pos_bboxes.new_full((num_samples,), self.num_classes, dtype=torch.long)
         label_weights = pos_bboxes.new_zeros(num_samples)
         bbox_targets = pos_bboxes.new_zeros(num_samples, 4)
         bbox_weights = pos_bboxes.new_zeros(num_samples, 4)
@@ -133,8 +129,7 @@ class BBoxHead(nn.Module):
             pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
             label_weights[:num_pos] = pos_weight
             if not self.reg_decoded_bbox:
-                pos_bbox_targets = self.bbox_coder.encode(
-                    pos_bboxes, pos_gt_bboxes)
+                pos_bbox_targets = self.bbox_coder.encode(pos_bboxes, pos_gt_bboxes)
             else:
                 # When the regression loss (e.g. `IouLoss`, `GIouLoss`)
                 # is applied directly on the decoded bounding boxes, both
@@ -148,12 +143,7 @@ class BBoxHead(nn.Module):
 
         return labels, label_weights, bbox_targets, bbox_weights
 
-    def get_targets(self,
-                    sampling_results,
-                    gt_bboxes,
-                    gt_labels,
-                    rcnn_train_cfg,
-                    concat=True):
+    def get_targets(self, sampling_results, gt_bboxes, gt_labels, rcnn_train_cfg, concat=True):
         """Calculate the ground truth for all samples in a batch according to
         the sampling_results.
 
@@ -206,7 +196,8 @@ class BBoxHead(nn.Module):
             neg_bboxes_list,
             pos_gt_bboxes_list,
             pos_gt_labels_list,
-            cfg=rcnn_train_cfg)
+            cfg=rcnn_train_cfg,
+        )
 
         if concat:
             labels = torch.cat(labels, 0)
@@ -215,27 +206,30 @@ class BBoxHead(nn.Module):
             bbox_weights = torch.cat(bbox_weights, 0)
         return labels, label_weights, bbox_targets, bbox_weights
 
-    @force_fp32(apply_to=('cls_score', 'bbox_pred'))
-    def loss(self,
-             cls_score,
-             bbox_pred,
-             rois,
-             labels,
-             label_weights,
-             bbox_targets,
-             bbox_weights,
-             reduction_override=None):
+    @force_fp32(apply_to=("cls_score", "bbox_pred"))
+    def loss(
+        self,
+        cls_score,
+        bbox_pred,
+        rois,
+        labels,
+        label_weights,
+        bbox_targets,
+        bbox_weights,
+        reduction_override=None,
+    ):
         losses = dict()
         if cls_score is not None:
-            avg_factor = max(torch.sum(label_weights > 0).float().item(), 1.)
+            avg_factor = max(torch.sum(label_weights > 0).float().item(), 1.0)
             if cls_score.numel() > 0:
-                losses['loss_cls'] = self.loss_cls(
+                losses["loss_cls"] = self.loss_cls(
                     cls_score,
                     labels,
                     label_weights,
                     avg_factor=avg_factor,
-                    reduction_override=reduction_override)
-                losses['acc'] = accuracy(cls_score, labels)
+                    reduction_override=reduction_override,
+                )
+                losses["acc"] = accuracy(cls_score, labels)
         if bbox_pred is not None:
             bg_class_ind = self.num_classes
             # 0~self.num_classes-1 are FG, self.num_classes is BG
@@ -249,32 +243,26 @@ class BBoxHead(nn.Module):
                     # already encoded coordinates to absolute format.
                     bbox_pred = self.bbox_coder.decode(rois[:, 1:], bbox_pred)
                 if self.reg_class_agnostic:
-                    pos_bbox_pred = bbox_pred.view(
-                        bbox_pred.size(0), 4)[pos_inds.type(torch.bool)]
+                    pos_bbox_pred = bbox_pred.view(bbox_pred.size(0), 4)[pos_inds.type(torch.bool)]
                 else:
-                    pos_bbox_pred = bbox_pred.view(
-                        bbox_pred.size(0), -1,
-                        4)[pos_inds.type(torch.bool),
-                           labels[pos_inds.type(torch.bool)]]
-                losses['loss_bbox'] = self.loss_bbox(
+                    pos_bbox_pred = bbox_pred.view(bbox_pred.size(0), -1, 4)[
+                        pos_inds.type(torch.bool), labels[pos_inds.type(torch.bool)]
+                    ]
+                losses["loss_bbox"] = self.loss_bbox(
                     pos_bbox_pred,
                     bbox_targets[pos_inds.type(torch.bool)],
                     bbox_weights[pos_inds.type(torch.bool)],
                     avg_factor=bbox_targets.size(0),
-                    reduction_override=reduction_override)
+                    reduction_override=reduction_override,
+                )
             else:
-                losses['loss_bbox'] = bbox_pred[pos_inds].sum()
+                losses["loss_bbox"] = bbox_pred[pos_inds].sum()
         return losses
 
-    @force_fp32(apply_to=('cls_score', 'bbox_pred'))
-    def get_bboxes(self,
-                   rois,
-                   cls_score,
-                   bbox_pred,
-                   img_shape,
-                   scale_factor,
-                   rescale=False,
-                   cfg=None):
+    @force_fp32(apply_to=("cls_score", "bbox_pred"))
+    def get_bboxes(
+        self, rois, cls_score, bbox_pred, img_shape, scale_factor, rescale=False, cfg=None
+    ):
         """Transform network output for a batch into bbox predictions.
 
         If the input rois has batch dimension, the function would be in
@@ -318,8 +306,7 @@ class BBoxHead(nn.Module):
         if isinstance(cls_score, list):
             cls_score = sum(cls_score) / float(len(cls_score))
 
-        scores = F.softmax(
-            cls_score, dim=-1) if cls_score is not None else None
+        scores = F.softmax(cls_score, dim=-1) if cls_score is not None else None
 
         batch_mode = True
         if rois.ndim == 2:
@@ -334,15 +321,13 @@ class BBoxHead(nn.Module):
             rois = rois.unsqueeze(0)
 
         if bbox_pred is not None:
-            bboxes = self.bbox_coder.decode(
-                rois[..., 1:], bbox_pred, max_shape=img_shape)
+            bboxes = self.bbox_coder.decode(rois[..., 1:], bbox_pred, max_shape=img_shape)
         else:
             bboxes = rois[..., 1:].clone()
             if img_shape is not None:
                 max_shape = bboxes.new_tensor(img_shape)[..., :2]
                 min_xy = bboxes.new_tensor(0)
-                max_xy = torch.cat(
-                    [max_shape] * 2, dim=-1).flip(-1).unsqueeze(-2)
+                max_xy = torch.cat([max_shape] * 2, dim=-1).flip(-1).unsqueeze(-2)
                 bboxes = torch.where(bboxes < min_xy, min_xy, bboxes)
                 bboxes = torch.where(bboxes > max_xy, max_xy, bboxes)
 
@@ -350,18 +335,18 @@ class BBoxHead(nn.Module):
             if not isinstance(scale_factor, tuple):
                 scale_factor = tuple([scale_factor])
             # B, 1, bboxes.size(-1)
-            scale_factor = bboxes.new_tensor(scale_factor).unsqueeze(1).repeat(
-                1, 1,
-                bboxes.size(-1) // 4)
+            scale_factor = (
+                bboxes.new_tensor(scale_factor).unsqueeze(1).repeat(1, 1, bboxes.size(-1) // 4)
+            )
             bboxes /= scale_factor
 
         det_bboxes = []
         det_labels = []
         for (bbox, score) in zip(bboxes, scores):
             if cfg is not None:
-                det_bbox, det_label = multiclass_nms(bbox, score,
-                                                     cfg.score_thr, cfg.nms,
-                                                     cfg.max_per_img)
+                det_bbox, det_label = multiclass_nms(
+                    bbox, score, cfg.score_thr, cfg.nms, cfg.max_per_img
+                )
             else:
                 det_bbox, det_label = bbox, score
             det_bboxes.append(det_bbox)
@@ -372,7 +357,7 @@ class BBoxHead(nn.Module):
             det_labels = det_labels[0]
         return det_bboxes, det_labels
 
-    @force_fp32(apply_to=('bbox_preds', ))
+    @force_fp32(apply_to=("bbox_preds",))
     def refine_bboxes(self, rois, labels, bbox_preds, pos_is_gts, img_metas):
         """Refine bboxes during training.
 
@@ -429,8 +414,7 @@ class BBoxHead(nn.Module):
 
         bboxes_list = []
         for i in range(len(img_metas)):
-            inds = torch.nonzero(
-                rois[:, 0] == i, as_tuple=False).squeeze(dim=1)
+            inds = torch.nonzero(rois[:, 0] == i, as_tuple=False).squeeze(dim=1)
             num_rois = inds.numel()
 
             bboxes_ = rois[inds, 1:]
@@ -439,19 +423,18 @@ class BBoxHead(nn.Module):
             img_meta_ = img_metas[i]
             pos_is_gts_ = pos_is_gts[i]
 
-            bboxes = self.regress_by_class(bboxes_, label_, bbox_pred_,
-                                           img_meta_)
+            bboxes = self.regress_by_class(bboxes_, label_, bbox_pred_, img_meta_)
 
             # filter gt bboxes
             pos_keep = 1 - pos_is_gts_
             keep_inds = pos_is_gts_.new_ones(num_rois)
-            keep_inds[:len(pos_is_gts_)] = pos_keep
+            keep_inds[: len(pos_is_gts_)] = pos_keep
 
             bboxes_list.append(bboxes[keep_inds.type(torch.bool)])
 
         return bboxes_list
 
-    @force_fp32(apply_to=('bbox_pred', ))
+    @force_fp32(apply_to=("bbox_pred",))
     def regress_by_class(self, rois, label, bbox_pred, img_meta):
         """Regress the bbox for the predicted class. Used in Cascade R-CNN.
 
@@ -473,11 +456,9 @@ class BBoxHead(nn.Module):
         assert bbox_pred.size(1) == 4
 
         if rois.size(1) == 4:
-            new_rois = self.bbox_coder.decode(
-                rois, bbox_pred, max_shape=img_meta['img_shape'])
+            new_rois = self.bbox_coder.decode(rois, bbox_pred, max_shape=img_meta["img_shape"])
         else:
-            bboxes = self.bbox_coder.decode(
-                rois[:, 1:], bbox_pred, max_shape=img_meta['img_shape'])
+            bboxes = self.bbox_coder.decode(rois[:, 1:], bbox_pred, max_shape=img_meta["img_shape"])
             new_rois = torch.cat((rois[:, [0]], bboxes), dim=1)
 
         return new_rois

@@ -27,15 +27,17 @@ class HRFPN(nn.Module):
         stride (int): stride of 3x3 convolutional layers
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 num_outs=5,
-                 pooling_type='AVG',
-                 conv_cfg=None,
-                 norm_cfg=None,
-                 with_cp=False,
-                 stride=1):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        num_outs=5,
+        pooling_type="AVG",
+        conv_cfg=None,
+        norm_cfg=None,
+        with_cp=False,
+        stride=1,
+    ):
         super(HRFPN, self).__init__()
         assert isinstance(in_channels, list)
         self.in_channels = in_channels
@@ -47,11 +49,8 @@ class HRFPN(nn.Module):
         self.norm_cfg = norm_cfg
 
         self.reduction_conv = ConvModule(
-            sum(in_channels),
-            out_channels,
-            kernel_size=1,
-            conv_cfg=self.conv_cfg,
-            act_cfg=None)
+            sum(in_channels), out_channels, kernel_size=1, conv_cfg=self.conv_cfg, act_cfg=None
+        )
 
         self.fpn_convs = nn.ModuleList()
         for i in range(self.num_outs):
@@ -63,9 +62,11 @@ class HRFPN(nn.Module):
                     padding=1,
                     stride=stride,
                     conv_cfg=self.conv_cfg,
-                    act_cfg=None))
+                    act_cfg=None,
+                )
+            )
 
-        if pooling_type == 'MAX':
+        if pooling_type == "MAX":
             self.pooling = F.max_pool2d
         else:
             self.pooling = F.avg_pool2d
@@ -81,8 +82,7 @@ class HRFPN(nn.Module):
         assert len(inputs) == self.num_ins
         outs = [inputs[0]]
         for i in range(1, self.num_ins):
-            outs.append(
-                F.interpolate(inputs[i], scale_factor=2**i, mode='bilinear'))
+            outs.append(F.interpolate(inputs[i], scale_factor=2**i, mode="bilinear"))
         out = torch.cat(outs, dim=1)
         if out.requires_grad and self.with_cp:
             out = checkpoint(self.reduction_conv, out)

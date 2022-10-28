@@ -8,8 +8,7 @@ from os import path as osp
 from torch import nn as nn
 from torch.nn import functional as F
 
-from mmdet3d.core import (Box3DMode, Coord3DMode, bbox3d2result,
-                          merge_aug_bboxes_3d, show_result)
+from mmdet3d.core import Box3DMode, Coord3DMode, bbox3d2result, merge_aug_bboxes_3d, show_result
 from mmdet3d.ops import Voxelization
 from mmdet.core import multi_apply
 from mmdet.models import DETECTORS
@@ -24,8 +23,8 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
     def __init__(self, **kwargs):
         super(BEVF_TransFusion, self).__init__(**kwargs)
 
-        self.freeze_img = kwargs.get('freeze_img', False)
-        self.init_weights(pretrained=kwargs.get('pretrained', None))
+        self.freeze_img = kwargs.get("freeze_img", False)
+        self.init_weights(pretrained=kwargs.get("pretrained", None))
 
     def init_weights(self, pretrained=None):
         """Initialize model weights."""
@@ -95,14 +94,14 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
         num_points = torch.cat(num_points, dim=0)
         coors_batch = []
         for i, coor in enumerate(coors):
-            coor_pad = F.pad(coor, (1, 0), mode='constant', value=i)
+            coor_pad = F.pad(coor, (1, 0), mode="constant", value=i)
             coors_batch.append(coor_pad)
         coors_batch = torch.cat(coors_batch, dim=0)
         return voxels, num_points, coors_batch
 
     def to_multi_cuda_devices(self):
-        device1 = int(os.environ['DEVICE_ID1'])
-        device2 = int(os.environ['DEVICE_ID2'])
+        device1 = int(os.environ["DEVICE_ID1"])
+        device2 = int(os.environ["DEVICE_ID2"])
         for name, module in self.named_modules():
             if "img_backbone" in name or "img_neck" in name:
                 module.cuda(device1)
@@ -112,22 +111,24 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
 
     def forward_train(self, *args, **kwargs):
         if "MODEL_PARALLELISM" in os.environ:
-            device1 = int(os.environ['DEVICE_ID1'])
+            device1 = int(os.environ["DEVICE_ID1"])
             # unpack mmcv DataContainer
             args, kwargs = scatter_kwargs(args, kwargs, [device1], dim=0)
         return self._forward_train(*args[0], **kwargs[0])
 
-    def _forward_train(self,
-                       points=None,
-                       img_metas=None,
-                       gt_bboxes_3d=None,
-                       gt_labels_3d=None,
-                       gt_labels=None,
-                       gt_bboxes=None,
-                       img=None,
-                       img_depth=None,
-                       proposals=None,
-                       gt_bboxes_ignore=None):
+    def _forward_train(
+        self,
+        points=None,
+        img_metas=None,
+        gt_bboxes_3d=None,
+        gt_labels_3d=None,
+        gt_labels=None,
+        gt_bboxes=None,
+        img=None,
+        img_depth=None,
+        proposals=None,
+        gt_bboxes_ignore=None,
+    ):
         """Forward training function.
 
         Args:
@@ -153,15 +154,14 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
         Returns:
             dict: Losses of different branches.
         """
-        feature_dict = self.extract_feat(
-            points, img=img, img_metas=img_metas)
-        img_feats = feature_dict['img_feats']
-        pts_feats = feature_dict['pts_feats']
-        depth_dist = feature_dict['depth_dist']
+        feature_dict = self.extract_feat(points, img=img, img_metas=img_metas)
+        img_feats = feature_dict["img_feats"]
+        pts_feats = feature_dict["pts_feats"]
+        depth_dist = feature_dict["depth_dist"]
         losses = dict()
         if pts_feats:
             if "MODEL_PARALLELISM" in os.environ:
-                device2 = int(os.environ['DEVICE_ID2'])
+                device2 = int(os.environ["DEVICE_ID2"])
                 if pts_feats:
                     for i, _ in enumerate(pts_feats):
                         pts_feats[i] = pts_feats[i].cuda(device2)
@@ -170,9 +170,9 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
                         img_feats[i] = img_feats[i].cuda(device2)
                 for i, _ in enumerate(gt_labels_3d):
                     gt_labels_3d[i] = gt_labels_3d[i].cuda(device2)
-            losses_pts = self.forward_pts_train(pts_feats, img_feats, gt_bboxes_3d,
-                                                gt_labels_3d, img_metas,
-                                                gt_bboxes_ignore)
+            losses_pts = self.forward_pts_train(
+                pts_feats, img_feats, gt_bboxes_3d, gt_labels_3d, img_metas, gt_bboxes_ignore
+            )
             losses.update(losses_pts)
         if img_feats:
             losses_img = self.forward_img_train(
@@ -181,20 +181,22 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
                 gt_bboxes=gt_bboxes,
                 gt_labels=gt_labels,
                 gt_bboxes_ignore=gt_bboxes_ignore,
-                proposals=proposals)
+                proposals=proposals,
+            )
             if img_depth is not None:
-                loss_depth = self.depth_dist_loss(depth_dist, img_depth, loss_method=self.img_depth_loss_method, img=img) * self.img_depth_loss_weight
+                loss_depth = (
+                    self.depth_dist_loss(
+                        depth_dist, img_depth, loss_method=self.img_depth_loss_method, img=img
+                    )
+                    * self.img_depth_loss_weight
+                )
                 losses.update(img_depth_loss=loss_depth)
             losses.update(losses_img)
         return losses
 
-    def forward_pts_train(self,
-                          pts_feats,
-                          img_feats,
-                          gt_bboxes_3d,
-                          gt_labels_3d,
-                          img_metas,
-                          gt_bboxes_ignore=None):
+    def forward_pts_train(
+        self, pts_feats, img_feats, gt_bboxes_3d, gt_labels_3d, img_metas, gt_bboxes_ignore=None
+    ):
         """Forward function for point cloud branch.
 
         Args:
@@ -218,30 +220,25 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
     def simple_test_pts(self, x, x_img, img_metas, rescale=False):
         """Test function of point cloud branch."""
         outs = self.pts_bbox_head(x, x_img, img_metas)
-        bbox_list = self.pts_bbox_head.get_bboxes(
-            outs, img_metas, rescale=rescale)
+        bbox_list = self.pts_bbox_head.get_bboxes(outs, img_metas, rescale=rescale)
         bbox_results = [
-            bbox3d2result(bboxes, scores, labels)
-            for bboxes, scores, labels in bbox_list
+            bbox3d2result(bboxes, scores, labels) for bboxes, scores, labels in bbox_list
         ]
         return bbox_results
 
     def simple_test(self, points, img_metas, img=None, rescale=False):
         """Test function without augmentaiton."""
-        feature_dict = self.extract_feat(
-            points, img=img, img_metas=img_metas)
-        img_feats = feature_dict['img_feats']
-        pts_feats = feature_dict['pts_feats']
+        feature_dict = self.extract_feat(points, img=img, img_metas=img_metas)
+        img_feats = feature_dict["img_feats"]
+        pts_feats = feature_dict["pts_feats"]
 
         bbox_list = [dict() for i in range(len(img_metas))]
         if pts_feats and self.with_pts_bbox:
-            bbox_pts = self.simple_test_pts(
-                pts_feats, img_feats, img_metas, rescale=rescale)
+            bbox_pts = self.simple_test_pts(pts_feats, img_feats, img_metas, rescale=rescale)
             for result_dict, pts_bbox in zip(bbox_list, bbox_pts):
-                result_dict['pts_bbox'] = pts_bbox
+                result_dict["pts_bbox"] = pts_bbox
         if img_feats and self.with_img_bbox:
-            bbox_img = self.simple_test_img(
-                img_feats, img_metas, rescale=rescale)
+            bbox_img = self.simple_test_img(img_feats, img_metas, rescale=rescale)
             for result_dict, img_bbox in zip(bbox_list, bbox_img):
-                result_dict['img_bbox'] = img_bbox
+                result_dict["img_bbox"] = img_bbox
         return bbox_list

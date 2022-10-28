@@ -13,17 +13,12 @@ class VoxelGenerator(object):
             Defaults to 20000.
     """
 
-    def __init__(self,
-                 voxel_size,
-                 point_cloud_range,
-                 max_num_points,
-                 max_voxels=20000):
+    def __init__(self, voxel_size, point_cloud_range, max_num_points, max_voxels=20000):
 
         point_cloud_range = np.array(point_cloud_range, dtype=np.float32)
         # [0, -40, -3, 70.4, 40, 1]
         voxel_size = np.array(voxel_size, dtype=np.float32)
-        grid_size = (point_cloud_range[3:] -
-                     point_cloud_range[:3]) / voxel_size
+        grid_size = (point_cloud_range[3:] - point_cloud_range[:3]) / voxel_size
         grid_size = np.round(grid_size).astype(np.int64)
 
         self._voxel_size = voxel_size
@@ -34,9 +29,14 @@ class VoxelGenerator(object):
 
     def generate(self, points):
         """Generate voxels given points."""
-        return points_to_voxel(points, self._voxel_size,
-                               self._point_cloud_range, self._max_num_points,
-                               True, self._max_voxels)
+        return points_to_voxel(
+            points,
+            self._voxel_size,
+            self._point_cloud_range,
+            self._max_num_points,
+            True,
+            self._max_voxels,
+        )
 
     @property
     def voxel_size(self):
@@ -61,23 +61,20 @@ class VoxelGenerator(object):
     def __repr__(self):
         """str: Return a string that describes the module."""
         repr_str = self.__class__.__name__
-        indent = ' ' * (len(repr_str) + 1)
-        repr_str += f'(voxel_size={self._voxel_size},\n'
-        repr_str += indent + 'point_cloud_range='
-        repr_str += f'{self._point_cloud_range.tolist()},\n'
-        repr_str += indent + f'max_num_points={self._max_num_points},\n'
-        repr_str += indent + f'max_voxels={self._max_voxels},\n'
-        repr_str += indent + f'grid_size={self._grid_size.tolist()}'
-        repr_str += ')'
+        indent = " " * (len(repr_str) + 1)
+        repr_str += f"(voxel_size={self._voxel_size},\n"
+        repr_str += indent + "point_cloud_range="
+        repr_str += f"{self._point_cloud_range.tolist()},\n"
+        repr_str += indent + f"max_num_points={self._max_num_points},\n"
+        repr_str += indent + f"max_voxels={self._max_voxels},\n"
+        repr_str += indent + f"grid_size={self._grid_size.tolist()}"
+        repr_str += ")"
         return repr_str
 
 
-def points_to_voxel(points,
-                    voxel_size,
-                    coors_range,
-                    max_points=35,
-                    reverse_index=True,
-                    max_voxels=20000):
+def points_to_voxel(
+    points, voxel_size, coors_range, max_points=35, reverse_index=True, max_voxels=20000
+):
     """convert kitti points(N, >=3) to voxels.
 
     Args:
@@ -110,21 +107,35 @@ def points_to_voxel(points,
     if reverse_index:
         voxelmap_shape = voxelmap_shape[::-1]
     # don't create large array in jit(nopython=True) code.
-    num_points_per_voxel = np.zeros(shape=(max_voxels, ), dtype=np.int32)
+    num_points_per_voxel = np.zeros(shape=(max_voxels,), dtype=np.int32)
     coor_to_voxelidx = -np.ones(shape=voxelmap_shape, dtype=np.int32)
-    voxels = np.zeros(
-        shape=(max_voxels, max_points, points.shape[-1]), dtype=points.dtype)
+    voxels = np.zeros(shape=(max_voxels, max_points, points.shape[-1]), dtype=points.dtype)
     coors = np.zeros(shape=(max_voxels, 3), dtype=np.int32)
     if reverse_index:
         voxel_num = _points_to_voxel_reverse_kernel(
-            points, voxel_size, coors_range, num_points_per_voxel,
-            coor_to_voxelidx, voxels, coors, max_points, max_voxels)
+            points,
+            voxel_size,
+            coors_range,
+            num_points_per_voxel,
+            coor_to_voxelidx,
+            voxels,
+            coors,
+            max_points,
+            max_voxels,
+        )
 
     else:
-        voxel_num = _points_to_voxel_kernel(points, voxel_size, coors_range,
-                                            num_points_per_voxel,
-                                            coor_to_voxelidx, voxels, coors,
-                                            max_points, max_voxels)
+        voxel_num = _points_to_voxel_kernel(
+            points,
+            voxel_size,
+            coors_range,
+            num_points_per_voxel,
+            coor_to_voxelidx,
+            voxels,
+            coors,
+            max_points,
+            max_voxels,
+        )
 
     coors = coors[:voxel_num]
     voxels = voxels[:voxel_num]
@@ -134,15 +145,17 @@ def points_to_voxel(points,
 
 
 @numba.jit(nopython=True)
-def _points_to_voxel_reverse_kernel(points,
-                                    voxel_size,
-                                    coors_range,
-                                    num_points_per_voxel,
-                                    coor_to_voxelidx,
-                                    voxels,
-                                    coors,
-                                    max_points=35,
-                                    max_voxels=20000):
+def _points_to_voxel_reverse_kernel(
+    points,
+    voxel_size,
+    coors_range,
+    num_points_per_voxel,
+    coor_to_voxelidx,
+    voxels,
+    coors,
+    max_points=35,
+    max_voxels=20000,
+):
     """convert kitti points(N, >=3) to voxels.
 
     Args:
@@ -179,7 +192,7 @@ def _points_to_voxel_reverse_kernel(points,
     # np.round(grid_size)
     # grid_size = np.round(grid_size).astype(np.int64)(np.int32)
     grid_size = np.round(grid_size, 0, grid_size).astype(np.int32)
-    coor = np.zeros(shape=(3, ), dtype=np.int32)
+    coor = np.zeros(shape=(3,), dtype=np.int32)
     voxel_num = 0
     failed = False
     for i in range(N):
@@ -208,15 +221,17 @@ def _points_to_voxel_reverse_kernel(points,
 
 
 @numba.jit(nopython=True)
-def _points_to_voxel_kernel(points,
-                            voxel_size,
-                            coors_range,
-                            num_points_per_voxel,
-                            coor_to_voxelidx,
-                            voxels,
-                            coors,
-                            max_points=35,
-                            max_voxels=20000):
+def _points_to_voxel_kernel(
+    points,
+    voxel_size,
+    coors_range,
+    num_points_per_voxel,
+    coor_to_voxelidx,
+    voxels,
+    coors,
+    max_points=35,
+    max_voxels=20000,
+):
     """convert kitti points(N, >=3) to voxels.
 
     Args:
@@ -251,7 +266,7 @@ def _points_to_voxel_kernel(points,
 
     # lower_bound = coors_range[:3]
     # upper_bound = coors_range[3:]
-    coor = np.zeros(shape=(3, ), dtype=np.int32)
+    coor = np.zeros(shape=(3,), dtype=np.int32)
     voxel_num = 0
     failed = False
     for i in range(N):

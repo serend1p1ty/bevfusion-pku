@@ -13,49 +13,52 @@ def test_fpn():
     out_channels = 8
     # `num_outs` is not equal to len(in_channels) - start_level
     with pytest.raises(AssertionError):
-        FPN(in_channels=in_channels,
-            out_channels=out_channels,
-            start_level=1,
-            num_outs=2)
+        FPN(in_channels=in_channels, out_channels=out_channels, start_level=1, num_outs=2)
 
     # `end_level` is larger than len(in_channels) - 1
     with pytest.raises(AssertionError):
-        FPN(in_channels=in_channels,
+        FPN(
+            in_channels=in_channels,
             out_channels=out_channels,
             start_level=1,
             end_level=4,
-            num_outs=2)
+            num_outs=2,
+        )
 
     # `num_outs` is not equal to end_level - start_level
     with pytest.raises(AssertionError):
-        FPN(in_channels=in_channels,
+        FPN(
+            in_channels=in_channels,
             out_channels=out_channels,
             start_level=1,
             end_level=3,
-            num_outs=1)
+            num_outs=1,
+        )
 
     # Invalid `add_extra_convs` option
     with pytest.raises(AssertionError):
-        FPN(in_channels=in_channels,
+        FPN(
+            in_channels=in_channels,
             out_channels=out_channels,
             start_level=1,
-            add_extra_convs='on_xxx',
-            num_outs=5)
+            add_extra_convs="on_xxx",
+            num_outs=5,
+        )
 
     fpn_model = FPN(
         in_channels=in_channels,
         out_channels=out_channels,
         start_level=1,
         add_extra_convs=True,
-        num_outs=5)
+        num_outs=5,
+    )
 
     # FPN expects a multiple levels of features per image
     feats = [
-        torch.rand(1, in_channels[i], feat_sizes[i], feat_sizes[i])
-        for i in range(len(in_channels))
+        torch.rand(1, in_channels[i], feat_sizes[i], feat_sizes[i]) for i in range(len(in_channels))
     ]
     outs = fpn_model(feats)
-    assert fpn_model.add_extra_convs == 'on_input'
+    assert fpn_model.add_extra_convs == "on_input"
     assert len(outs) == fpn_model.num_outs
     for i in range(fpn_model.num_outs):
         outs[i].shape[1] == out_channels
@@ -67,7 +70,8 @@ def test_fpn():
         out_channels=out_channels,
         start_level=1,
         add_extra_convs=False,
-        num_outs=5)
+        num_outs=5,
+    )
     outs = fpn_model(feats)
     assert len(outs) == fpn_model.num_outs
     assert not fpn_model.add_extra_convs
@@ -82,11 +86,12 @@ def test_fpn():
         start_level=1,
         add_extra_convs=True,
         no_norm_on_lateral=False,
-        norm_cfg=dict(type='BN', requires_grad=True),
-        num_outs=5)
+        norm_cfg=dict(type="BN", requires_grad=True),
+        num_outs=5,
+    )
     outs = fpn_model(feats)
     assert len(outs) == fpn_model.num_outs
-    assert fpn_model.add_extra_convs == 'on_input'
+    assert fpn_model.add_extra_convs == "on_input"
     for i in range(fpn_model.num_outs):
         outs[i].shape[1] == out_channels
         outs[i].shape[2] == outs[i].shape[3] == s // (2**i)
@@ -102,12 +107,13 @@ def test_fpn():
         out_channels=out_channels,
         start_level=1,
         add_extra_convs=True,
-        upsample_cfg=dict(mode='bilinear', align_corners=True),
-        num_outs=5)
+        upsample_cfg=dict(mode="bilinear", align_corners=True),
+        num_outs=5,
+    )
     fpn_model(feats)
     outs = fpn_model(feats)
     assert len(outs) == fpn_model.num_outs
-    assert fpn_model.add_extra_convs == 'on_input'
+    assert fpn_model.add_extra_convs == "on_input"
     for i in range(fpn_model.num_outs):
         outs[i].shape[1] == out_channels
         outs[i].shape[2] == outs[i].shape[3] == s // (2**i)
@@ -119,7 +125,8 @@ def test_fpn():
         start_level=1,
         add_extra_convs=True,
         upsample_cfg=dict(scale_factor=2),
-        num_outs=5)
+        num_outs=5,
+    )
     outs = fpn_model(feats)
     assert len(outs) == fpn_model.num_outs
     for i in range(fpn_model.num_outs):
@@ -130,10 +137,11 @@ def test_fpn():
     fpn_model = FPN(
         in_channels=in_channels,
         out_channels=out_channels,
-        add_extra_convs='on_input',
+        add_extra_convs="on_input",
         start_level=1,
-        num_outs=5)
-    assert fpn_model.add_extra_convs == 'on_input'
+        num_outs=5,
+    )
+    assert fpn_model.add_extra_convs == "on_input"
     outs = fpn_model(feats)
     assert len(outs) == fpn_model.num_outs
     for i in range(fpn_model.num_outs):
@@ -144,10 +152,11 @@ def test_fpn():
     fpn_model = FPN(
         in_channels=in_channels,
         out_channels=out_channels,
-        add_extra_convs='on_lateral',
+        add_extra_convs="on_lateral",
         start_level=1,
-        num_outs=5)
-    assert fpn_model.add_extra_convs == 'on_lateral'
+        num_outs=5,
+    )
+    assert fpn_model.add_extra_convs == "on_lateral"
     outs = fpn_model(feats)
     assert len(outs) == fpn_model.num_outs
     for i in range(fpn_model.num_outs):
@@ -158,10 +167,11 @@ def test_fpn():
     fpn_model = FPN(
         in_channels=in_channels,
         out_channels=out_channels,
-        add_extra_convs='on_output',
+        add_extra_convs="on_output",
         start_level=1,
-        num_outs=5)
-    assert fpn_model.add_extra_convs == 'on_output'
+        num_outs=5,
+    )
+    assert fpn_model.add_extra_convs == "on_output"
     outs = fpn_model(feats)
     assert len(outs) == fpn_model.num_outs
     for i in range(fpn_model.num_outs):
@@ -177,7 +187,7 @@ def test_fpn():
         start_level=1,
         num_outs=5,
     )
-    assert fpn_model.add_extra_convs == 'on_output'
+    assert fpn_model.add_extra_convs == "on_output"
     outs = fpn_model(feats)
     assert len(outs) == fpn_model.num_outs
     for i in range(fpn_model.num_outs):
@@ -193,7 +203,7 @@ def test_fpn():
         start_level=1,
         num_outs=5,
     )
-    assert fpn_model.add_extra_convs == 'on_input'
+    assert fpn_model.add_extra_convs == "on_input"
     outs = fpn_model(feats)
     assert len(outs) == fpn_model.num_outs
     for i in range(fpn_model.num_outs):
@@ -209,27 +219,25 @@ def test_channel_mapper():
     out_channels = 8
     kernel_size = 3
     feats = [
-        torch.rand(1, in_channels[i], feat_sizes[i], feat_sizes[i])
-        for i in range(len(in_channels))
+        torch.rand(1, in_channels[i], feat_sizes[i], feat_sizes[i]) for i in range(len(in_channels))
     ]
 
     # in_channels must be a list
     with pytest.raises(AssertionError):
         channel_mapper = ChannelMapper(
-            in_channels=10, out_channels=out_channels, kernel_size=kernel_size)
+            in_channels=10, out_channels=out_channels, kernel_size=kernel_size
+        )
     # the length of channel_mapper's inputs must be equal to the length of
     # in_channels
     with pytest.raises(AssertionError):
         channel_mapper = ChannelMapper(
-            in_channels=in_channels[:-1],
-            out_channels=out_channels,
-            kernel_size=kernel_size)
+            in_channels=in_channels[:-1], out_channels=out_channels, kernel_size=kernel_size
+        )
         channel_mapper(feats)
 
     channel_mapper = ChannelMapper(
-        in_channels=in_channels,
-        out_channels=out_channels,
-        kernel_size=kernel_size)
+        in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size
+    )
 
     outs = channel_mapper(feats)
     assert len(outs) == len(feats)

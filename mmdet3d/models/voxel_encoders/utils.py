@@ -19,8 +19,7 @@ def get_paddings_indicator(actual_num, max_num, axis=0):
     # tiled_actual_num: [N, M, 1]
     max_num_shape = [1] * len(actual_num.shape)
     max_num_shape[axis + 1] = -1
-    max_num = torch.arange(
-        max_num, dtype=torch.int, device=actual_num.device).view(max_num_shape)
+    max_num = torch.arange(max_num, dtype=torch.int, device=actual_num.device).view(max_num_shape)
     # tiled_actual_num: [[3,3,3,3,3], [4,4,4,4,4], [2,2,2,2,2]]
     # tiled_max_num: [[0,1,2,3,4], [0,1,2,3,4], [0,1,2,3,4]]
     paddings_indicator = actual_num.int() > max_num
@@ -45,23 +44,25 @@ class VFELayer(nn.Module):
             and pointwise features.
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
-                 max_out=True,
-                 cat_max=True):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        norm_cfg=dict(type="BN1d", eps=1e-3, momentum=0.01),
+        max_out=True,
+        cat_max=True,
+    ):
         super(VFELayer, self).__init__()
         self.fp16_enabled = False
         self.cat_max = cat_max
         self.max_out = max_out
         # self.units = int(out_channels / 2)
-        print('create hard')
+        print("create hard")
 
         self.norm = build_norm_layer(norm_cfg, out_channels)[1]
         self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
-    @auto_fp16(apply_to=('inputs'), out_fp32=True)
+    @auto_fp16(apply_to=("inputs"), out_fp32=True)
     def forward(self, inputs):
         """Forward function.
 
@@ -84,8 +85,7 @@ class VFELayer(nn.Module):
         voxel_count = inputs.shape[1]
 
         x = self.linear(inputs)
-        x = self.norm(x.permute(0, 2, 1).contiguous()).permute(0, 2,
-                                                               1).contiguous()
+        x = self.norm(x.permute(0, 2, 1).contiguous()).permute(0, 2, 1).contiguous()
         pointwise = F.relu(x)
         # [K, T, units]
         if self.max_out:
@@ -115,18 +115,16 @@ class DynamicVFELayer(nn.Module):
         norm_cfg (dict): Config dict of normalization layers
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01)
-                 ):
+    def __init__(
+        self, in_channels, out_channels, norm_cfg=dict(type="BN1d", eps=1e-3, momentum=0.01)
+    ):
         super(DynamicVFELayer, self).__init__()
         self.fp16_enabled = False
         # self.units = int(out_channels / 2)
         self.norm = build_norm_layer(norm_cfg, out_channels)[1]
         self.linear = nn.Linear(in_channels, out_channels, bias=False)
 
-    @auto_fp16(apply_to=('inputs'), out_fp32=True)
+    @auto_fp16(apply_to=("inputs"), out_fp32=True)
     def forward(self, inputs):
         """Forward function.
 
@@ -160,16 +158,18 @@ class PFNLayer(nn.Module):
             Default to 'max'.
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
-                 last_layer=False,
-                 mode='max'):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        norm_cfg=dict(type="BN1d", eps=1e-3, momentum=0.01),
+        last_layer=False,
+        mode="max",
+    ):
 
         super().__init__()
         self.fp16_enabled = False
-        self.name = 'PFNLayer'
+        self.name = "PFNLayer"
         self.last_vfe = last_layer
         if not self.last_vfe:
             out_channels = out_channels // 2
@@ -178,10 +178,10 @@ class PFNLayer(nn.Module):
         self.norm = build_norm_layer(norm_cfg, self.units)[1]
         self.linear = nn.Linear(in_channels, self.units, bias=False)
 
-        assert mode in ['max', 'avg']
+        assert mode in ["max", "avg"]
         self.mode = mode
 
-    @auto_fp16(apply_to=('inputs'), out_fp32=True)
+    @auto_fp16(apply_to=("inputs"), out_fp32=True)
     def forward(self, inputs, num_voxels=None, aligned_distance=None):
         """Forward function.
 
@@ -198,20 +198,17 @@ class PFNLayer(nn.Module):
             torch.Tensor: Features of Pillars.
         """
         x = self.linear(inputs)
-        x = self.norm(x.permute(0, 2, 1).contiguous()).permute(0, 2,
-                                                               1).contiguous()
+        x = self.norm(x.permute(0, 2, 1).contiguous()).permute(0, 2, 1).contiguous()
         x = F.relu(x)
 
-        if self.mode == 'max':
+        if self.mode == "max":
             if aligned_distance is not None:
                 x = x.mul(aligned_distance.unsqueeze(-1))
             x_max = torch.max(x, dim=1, keepdim=True)[0]
-        elif self.mode == 'avg':
+        elif self.mode == "avg":
             if aligned_distance is not None:
                 x = x.mul(aligned_distance.unsqueeze(-1))
-            x_max = x.sum(
-                dim=1, keepdim=True) / num_voxels.type_as(inputs).view(
-                    -1, 1, 1)
+            x_max = x.sum(dim=1, keepdim=True) / num_voxels.type_as(inputs).view(-1, 1, 1)
 
         if self.last_vfe:
             return x_max

@@ -23,5 +23,6 @@ class SCNetSemanticHead(FusedSemanticHead):
                 self.conv_out_channels,
                 num_res_blocks,
                 conv_cfg=self.conv_cfg,
-                norm_cfg=self.norm_cfg)
+                norm_cfg=self.norm_cfg,
+            )
             self.num_convs = num_res_blocks

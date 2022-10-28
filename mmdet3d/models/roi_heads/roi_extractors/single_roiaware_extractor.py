@@ -22,7 +22,7 @@ class Single3DRoIAwareExtractor(nn.Module):
     def build_roi_layers(self, layer_cfg):
         """Build roi layers using `layer_cfg`"""
         cfg = layer_cfg.copy()
-        layer_type = cfg.pop('type')
+        layer_type = cfg.pop("type")
         assert hasattr(ops, layer_type)
         layer_cls = getattr(ops, layer_type)
         roi_layers = layer_cls(**cfg)
@@ -43,11 +43,11 @@ class Single3DRoIAwareExtractor(nn.Module):
         """
         pooled_roi_feats = []
         for batch_idx in range(int(batch_inds.max()) + 1):
-            roi_inds = (rois[..., 0].int() == batch_idx)
-            coors_inds = (batch_inds.int() == batch_idx)
-            pooled_roi_feat = self.roi_layer(rois[..., 1:][roi_inds],
-                                             coordinate[coors_inds],
-                                             feats[coors_inds])
+            roi_inds = rois[..., 0].int() == batch_idx
+            coors_inds = batch_inds.int() == batch_idx
+            pooled_roi_feat = self.roi_layer(
+                rois[..., 1:][roi_inds], coordinate[coors_inds], feats[coors_inds]
+            )
             pooled_roi_feats.append(pooled_roi_feat)
         pooled_roi_feats = torch.cat(pooled_roi_feats, 0)
         return pooled_roi_feats

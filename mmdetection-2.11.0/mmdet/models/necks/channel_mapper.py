@@ -38,13 +38,15 @@ class ChannelMapper(nn.Module):
         outputs[3].shape = torch.Size([1, 11, 43, 43])
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size=3,
-                 conv_cfg=None,
-                 norm_cfg=None,
-                 act_cfg=dict(type='ReLU')):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size=3,
+        conv_cfg=None,
+        norm_cfg=None,
+        act_cfg=dict(type="ReLU"),
+    ):
         super(ChannelMapper, self).__init__()
         assert isinstance(in_channels, list)
 
@@ -58,14 +60,16 @@ class ChannelMapper(nn.Module):
                     padding=(kernel_size - 1) // 2,
                     conv_cfg=conv_cfg,
                     norm_cfg=norm_cfg,
-                    act_cfg=act_cfg))
+                    act_cfg=act_cfg,
+                )
+            )
 
     # default init_weights for conv(msra) and norm in ConvModule
     def init_weights(self):
         """Initialize the weights of ChannelMapper module."""
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                xavier_init(m, distribution='uniform')
+                xavier_init(m, distribution="uniform")
 
     def forward(self, inputs):
         """Forward function."""

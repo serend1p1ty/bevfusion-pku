@@ -5,12 +5,9 @@ from torch import nn as nn
 class Base3DRoIHead(nn.Module, metaclass=ABCMeta):
     """Base class for 3d RoIHeads."""
 
-    def __init__(self,
-                 bbox_head=None,
-                 mask_roi_extractor=None,
-                 mask_head=None,
-                 train_cfg=None,
-                 test_cfg=None):
+    def __init__(
+        self, bbox_head=None, mask_roi_extractor=None, mask_head=None, train_cfg=None, test_cfg=None
+    ):
         super(Base3DRoIHead, self).__init__()
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
@@ -26,12 +23,12 @@ class Base3DRoIHead(nn.Module, metaclass=ABCMeta):
     @property
     def with_bbox(self):
         """bool: whether the RoIHead has box head"""
-        return hasattr(self, 'bbox_head') and self.bbox_head is not None
+        return hasattr(self, "bbox_head") and self.bbox_head is not None
 
     @property
     def with_mask(self):
         """bool: whether the RoIHead has mask head"""
-        return hasattr(self, 'mask_head') and self.mask_head is not None
+        return hasattr(self, "mask_head") and self.mask_head is not None
 
     @abstractmethod
     def init_weights(self, pretrained):
@@ -54,14 +51,9 @@ class Base3DRoIHead(nn.Module, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def forward_train(self,
-                      x,
-                      img_metas,
-                      proposal_list,
-                      gt_bboxes,
-                      gt_labels,
-                      gt_bboxes_ignore=None,
-                      **kwargs):
+    def forward_train(
+        self, x, img_metas, proposal_list, gt_bboxes, gt_labels, gt_bboxes_ignore=None, **kwargs
+    ):
         """Forward function during training.
 
         Args:
@@ -80,13 +72,7 @@ class Base3DRoIHead(nn.Module, metaclass=ABCMeta):
         """
         pass
 
-    def simple_test(self,
-                    x,
-                    proposal_list,
-                    img_metas,
-                    proposals=None,
-                    rescale=False,
-                    **kwargs):
+    def simple_test(self, x, proposal_list, img_metas, proposals=None, rescale=False, **kwargs):
         """Test without augmentation."""
         pass
 

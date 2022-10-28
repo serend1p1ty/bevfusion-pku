@@ -24,7 +24,7 @@ class PointPillarsScatter(nn.Module):
         self.in_channels = in_channels
         self.fp16_enabled = False
 
-    @auto_fp16(apply_to=('voxel_features', ))
+    @auto_fp16(apply_to=("voxel_features",))
     def forward(self, voxel_features, coors, batch_size=None):
         """Foraward function to scatter features."""
         # TODO: rewrite the function in a batch manner
@@ -47,7 +47,8 @@ class PointPillarsScatter(nn.Module):
             self.in_channels,
             self.nx * self.ny,
             dtype=voxel_features.dtype,
-            device=voxel_features.device)
+            device=voxel_features.device,
+        )
 
         indices = coors[:, 1] * self.nx + coors[:, 2]
         indices = indices.long()
@@ -75,7 +76,8 @@ class PointPillarsScatter(nn.Module):
                 self.in_channels,
                 self.nx * self.ny,
                 dtype=voxel_features.dtype,
-                device=voxel_features.device)
+                device=voxel_features.device,
+            )
 
             # Only include non-empty pillars
             batch_mask = coors[:, 0] == batch_itt
@@ -95,7 +97,6 @@ class PointPillarsScatter(nn.Module):
         batch_canvas = torch.stack(batch_canvas, 0)
 
         # Undo the column stacking to final 4-dim tensor
-        batch_canvas = batch_canvas.view(batch_size, self.in_channels, self.ny,
-                                         self.nx)
+        batch_canvas = batch_canvas.view(batch_size, self.in_channels, self.ny, self.nx)
 
         return batch_canvas

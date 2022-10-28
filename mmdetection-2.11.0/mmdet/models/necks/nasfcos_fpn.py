@@ -28,15 +28,17 @@ class NASFCOS_FPN(nn.Module):
         norm_cfg (dict): dictionary to construct and config norm layer.
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 num_outs,
-                 start_level=1,
-                 end_level=-1,
-                 add_extra_convs=False,
-                 conv_cfg=None,
-                 norm_cfg=None):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        num_outs,
+        start_level=1,
+        end_level=-1,
+        add_extra_convs=False,
+        conv_cfg=None,
+        norm_cfg=None,
+    ):
         super(NASFCOS_FPN, self).__init__()
         assert isinstance(in_channels, list)
         self.in_channels = in_channels
@@ -66,42 +68,42 @@ class NASFCOS_FPN(nn.Module):
                 stride=1,
                 padding=0,
                 bias=False,
-                norm_cfg=dict(type='BN'),
-                act_cfg=dict(type='ReLU', inplace=False))
+                norm_cfg=dict(type="BN"),
+                act_cfg=dict(type="ReLU", inplace=False),
+            )
             self.adapt_convs.append(adapt_conv)
 
         # C2 is omitted according to the paper
         extra_levels = num_outs - self.backbone_end_level + self.start_level
 
         def build_concat_cell(with_input1_conv, with_input2_conv):
-            cell_conv_cfg = dict(
-                kernel_size=1, padding=0, bias=False, groups=out_channels)
+            cell_conv_cfg = dict(kernel_size=1, padding=0, bias=False, groups=out_channels)
             return ConcatCell(
                 in_channels=out_channels,
                 out_channels=out_channels,
                 with_out_conv=True,
                 out_conv_cfg=cell_conv_cfg,
-                out_norm_cfg=dict(type='BN'),
-                out_conv_order=('norm', 'act', 'conv'),
+                out_norm_cfg=dict(type="BN"),
+                out_conv_order=("norm", "act", "conv"),
                 with_input1_conv=with_input1_conv,
                 with_input2_conv=with_input2_conv,
                 input_conv_cfg=conv_cfg,
                 input_norm_cfg=norm_cfg,
-                upsample_mode='nearest')
+                upsample_mode="nearest",
+            )
 
         # Denote c3=f0, c4=f1, c5=f2 for convince
         self.fpn = nn.ModuleDict()
-        self.fpn['c22_1'] = build_concat_cell(True, True)
-        self.fpn['c22_2'] = build_concat_cell(True, True)
-        self.fpn['c32'] = build_concat_cell(True, False)
-        self.fpn['c02'] = build_concat_cell(True, False)
-        self.fpn['c42'] = build_concat_cell(True, True)
-        self.fpn['c36'] = build_concat_cell(True, True)
-        self.fpn['c61'] = build_concat_cell(True, True)  # f9
+        self.fpn["c22_1"] = build_concat_cell(True, True)
+        self.fpn["c22_2"] = build_concat_cell(True, True)
+        self.fpn["c32"] = build_concat_cell(True, False)
+        self.fpn["c02"] = build_concat_cell(True, False)
+        self.fpn["c42"] = build_concat_cell(True, True)
+        self.fpn["c36"] = build_concat_cell(True, True)
+        self.fpn["c61"] = build_concat_cell(True, True)  # f9
         self.extra_downsamples = nn.ModuleList()
         for i in range(extra_levels):
-            extra_act_cfg = None if i == 0 \
-                else dict(type='ReLU', inplace=False)
+            extra_act_cfg = None if i == 0 else dict(type="ReLU", inplace=False)
             self.extra_downsamples.append(
                 ConvModule(
                     out_channels,
@@ -110,7 +112,9 @@ class NASFCOS_FPN(nn.Module):
                     stride=2,
                     padding=1,
                     act_cfg=extra_act_cfg,
-                    order=('act', 'norm', 'conv')))
+                    order=("act", "norm", "conv"),
+                )
+            )
 
     def forward(self, inputs):
         """Forward function."""
@@ -128,18 +132,18 @@ class NASFCOS_FPN(nn.Module):
         for (idx, input_idx) in zip([9, 8, 7], [1, 2, 3]):  # add P3, P4, P5
             feats1, feats2 = feats[idx], feats[5]
             feats2_resize = F.interpolate(
-                feats2,
-                size=feats1.size()[2:],
-                mode='bilinear',
-                align_corners=False)
+                feats2, size=feats1.size()[2:], mode="bilinear", align_corners=False
+            )
 
             feats_sum = feats1 + feats2_resize
             ret.append(
                 F.interpolate(
                     feats_sum,
                     size=inputs[input_idx].size()[2:],
-                    mode='bilinear',
-                    align_corners=False))
+                    mode="bilinear",
+                    align_corners=False,
+                )
+            )
 
         for submodule in self.extra_downsamples:
             ret.append(submodule(ret[-1]))
@@ -149,13 +153,10 @@ class NASFCOS_FPN(nn.Module):
     def init_weights(self):
         """Initialize the weights of module."""
         for module in self.fpn.values():
-            if hasattr(module, 'conv_out'):
+            if hasattr(module, "conv_out"):
                 caffe2_xavier_init(module.out_conv.conv)
 
-        for modules in [
-                self.adapt_convs.modules(),
-                self.extra_downsamples.modules()
-        ]:
+        for modules in [self.adapt_convs.modules(), self.extra_downsamples.modules()]:
             for module in modules:
                 if isinstance(module, nn.Conv2d):
                     caffe2_xavier_init(module)

@@ -6,7 +6,12 @@ from .part_aggregation_roi_head import PartAggregationROIHead
 from .roi_extractors import Single3DRoIAwareExtractor, SingleRoIExtractor
 
 __all__ = [
-    'Base3DRoIHead', 'PartAggregationROIHead', 'PointwiseSemanticHead',
-    'Single3DRoIAwareExtractor', 'PartA2BboxHead', 'SingleRoIExtractor',
-    'H3DRoIHead', 'PrimitiveHead'
+    "Base3DRoIHead",
+    "PartAggregationROIHead",
+    "PointwiseSemanticHead",
+    "Single3DRoIAwareExtractor",
+    "PartA2BboxHead",
+    "SingleRoIExtractor",
+    "H3DRoIHead",
+    "PrimitiveHead",
 ]

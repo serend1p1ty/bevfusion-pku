@@ -8,15 +8,10 @@ try:
     import open3d as o3d
     from open3d import geometry
 except ImportError:
-    raise ImportError(
-        'Please run "pip install open3d" to install open3d first.')
+    raise ImportError('Please run "pip install open3d" to install open3d first.')
 
 
-def _draw_points(points,
-                 vis,
-                 points_size=2,
-                 point_color=(0.5, 0.5, 0.5),
-                 mode='xyz'):
+def _draw_points(points, vis, points_size=2, point_color=(0.5, 0.5, 0.5), mode="xyz"):
     """Draw points on visualizer.
     Args:
         points (numpy.array | torch.tensor, shape=[N, 3+C]):
@@ -37,10 +32,10 @@ def _draw_points(points,
 
     points = points.copy()
     pcd = geometry.PointCloud()
-    if mode == 'xyz':
+    if mode == "xyz":
         pcd.points = o3d.utility.Vector3dVector(points[:, :3])
         points_colors = np.tile(np.array(point_color), (points.shape[0], 1))
-    elif mode == 'xyzrgb':
+    elif mode == "xyzrgb":
         pcd.points = o3d.utility.Vector3dVector(points[:, :3])
         points_colors = points[:, 3:6]
         # normalize to [0, 1] for open3d drawing
@@ -55,15 +50,17 @@ def _draw_points(points,
     return pcd, points_colors
 
 
-def _draw_bboxes(bbox3d,
-                 vis,
-                 points_colors,
-                 pcd=None,
-                 bbox_color=(0, 1, 0),
-                 points_in_box_color=(1, 0, 0),
-                 rot_axis=2,
-                 center_mode='lidar_bottom',
-                 mode='xyz'):
+def _draw_bboxes(
+    bbox3d,
+    vis,
+    points_colors,
+    pcd=None,
+    bbox_color=(0, 1, 0),
+    points_in_box_color=(1, 0, 0),
+    rot_axis=2,
+    center_mode="lidar_bottom",
+    mode="xyz",
+):
     """Draw bbox on visualizer and change the color of points inside bbox3d.
     Args:
         bbox3d (numpy.array | torch.tensor, shape=[M, 7]):
@@ -95,12 +92,10 @@ def _draw_bboxes(bbox3d,
         yaw[rot_axis] = -bbox3d[i, 6]
         rot_mat = geometry.get_rotation_matrix_from_xyz(yaw)
 
-        if center_mode == 'lidar_bottom':
-            center[rot_axis] += dim[
-                rot_axis] / 2  # bottom center to gravity center
-        elif center_mode == 'camera_bottom':
-            center[rot_axis] -= dim[
-                rot_axis] / 2  # bottom center to gravity center
+        if center_mode == "lidar_bottom":
+            center[rot_axis] += dim[rot_axis] / 2  # bottom center to gravity center
+        elif center_mode == "camera_bottom":
+            center[rot_axis] -= dim[rot_axis] / 2  # bottom center to gravity center
         box3d = geometry.OrientedBoundingBox(center, rot_mat, dim)
 
         line_set = geometry.LineSet.create_from_oriented_bounding_box(box3d)
@@ -109,7 +104,7 @@ def _draw_bboxes(bbox3d,
         vis.add_geometry(line_set)
 
         # change the color of points which are in box
-        if pcd is not None and mode == 'xyz':
+        if pcd is not None and mode == "xyz":
             indices = box3d.get_point_indices_within_bounding_box(pcd.points)
             points_colors[indices] = in_box_color
 
@@ -119,17 +114,19 @@ def _draw_bboxes(bbox3d,
         vis.update_geometry(pcd)
 
 
-def show_pts_boxes(points,
-                   bbox3d=None,
-                   show=True,
-                   save_path=None,
-                   points_size=2,
-                   point_color=(0.5, 0.5, 0.5),
-                   bbox_color=(0, 1, 0),
-                   points_in_box_color=(1, 0, 0),
-                   rot_axis=2,
-                   center_mode='lidar_bottom',
-                   mode='xyz'):
+def show_pts_boxes(
+    points,
+    bbox3d=None,
+    show=True,
+    save_path=None,
+    points_size=2,
+    point_color=(0.5, 0.5, 0.5),
+    bbox_color=(0, 1, 0),
+    points_in_box_color=(1, 0, 0),
+    rot_axis=2,
+    center_mode="lidar_bottom",
+    mode="xyz",
+):
     """Draw bbox and points on visualizer.
     Args:
         points (numpy.array | torch.tensor, shape=[N, 3+C]):
@@ -163,17 +160,26 @@ def show_pts_boxes(points,
     vis = o3d.visualization.Visualizer()
     vis.create_window()
     mesh_frame = geometry.TriangleMesh.create_coordinate_frame(
-        size=1, origin=[0, 0, 0])  # create coordinate frame
+        size=1, origin=[0, 0, 0]
+    )  # create coordinate frame
     vis.add_geometry(mesh_frame)
 
     # draw points
-    pcd, points_colors = _draw_points(points, vis, points_size, point_color,
-                                      mode)
+    pcd, points_colors = _draw_points(points, vis, points_size, point_color, mode)
 
     # draw boxes
     if bbox3d is not None:
-        _draw_bboxes(bbox3d, vis, points_colors, pcd, bbox_color,
-                     points_in_box_color, rot_axis, center_mode, mode)
+        _draw_bboxes(
+            bbox3d,
+            vis,
+            points_colors,
+            pcd,
+            bbox_color,
+            points_in_box_color,
+            rot_axis,
+            center_mode,
+            mode,
+        )
 
     if show:
         vis.run()
@@ -184,16 +190,18 @@ def show_pts_boxes(points,
     vis.destroy_window()
 
 
-def _draw_bboxes_ind(bbox3d,
-                     vis,
-                     indices,
-                     points_colors,
-                     pcd=None,
-                     bbox_color=(0, 1, 0),
-                     points_in_box_color=(1, 0, 0),
-                     rot_axis=2,
-                     center_mode='lidar_bottom',
-                     mode='xyz'):
+def _draw_bboxes_ind(
+    bbox3d,
+    vis,
+    indices,
+    points_colors,
+    pcd=None,
+    bbox_color=(0, 1, 0),
+    points_in_box_color=(1, 0, 0),
+    rot_axis=2,
+    center_mode="lidar_bottom",
+    mode="xyz",
+):
     """Draw bbox on visualizer and change the color or points inside bbox3d
     with indices.
     Args:
@@ -232,12 +240,10 @@ def _draw_bboxes_ind(bbox3d,
         # yaw[rot_axis] = -(bbox3d[i, 6] - 0.5 * np.pi)
         yaw[rot_axis] = -bbox3d[i, 6]
         rot_mat = geometry.get_rotation_matrix_from_xyz(yaw)
-        if center_mode == 'lidar_bottom':
-            center[rot_axis] += dim[
-                rot_axis] / 2  # bottom center to gravity center
-        elif center_mode == 'camera_bottom':
-            center[rot_axis] -= dim[
-                rot_axis] / 2  # bottom center to gravity center
+        if center_mode == "lidar_bottom":
+            center[rot_axis] += dim[rot_axis] / 2  # bottom center to gravity center
+        elif center_mode == "camera_bottom":
+            center[rot_axis] -= dim[rot_axis] / 2  # bottom center to gravity center
         box3d = geometry.OrientedBoundingBox(center, rot_mat, dim)
 
         line_set = geometry.LineSet.create_from_oriented_bounding_box(box3d)
@@ -246,7 +252,7 @@ def _draw_bboxes_ind(bbox3d,
         vis.add_geometry(line_set)
 
         # change the color of points which are in box
-        if pcd is not None and mode == 'xyz':
+        if pcd is not None and mode == "xyz":
             points_colors[indices[:, i].astype(np.bool)] = in_box_color
 
     # update points colors
@@ -255,18 +261,20 @@ def _draw_bboxes_ind(bbox3d,
         vis.update_geometry(pcd)
 
 
-def show_pts_index_boxes(points,
-                         bbox3d=None,
-                         show=True,
-                         indices=None,
-                         save_path=None,
-                         points_size=2,
-                         point_color=(0.5, 0.5, 0.5),
-                         bbox_color=(0, 1, 0),
-                         points_in_box_color=(1, 0, 0),
-                         rot_axis=2,
-                         center_mode='lidar_bottom',
-                         mode='xyz'):
+def show_pts_index_boxes(
+    points,
+    bbox3d=None,
+    show=True,
+    indices=None,
+    save_path=None,
+    points_size=2,
+    point_color=(0.5, 0.5, 0.5),
+    bbox_color=(0, 1, 0),
+    points_in_box_color=(1, 0, 0),
+    rot_axis=2,
+    center_mode="lidar_bottom",
+    mode="xyz",
+):
     """Draw bbox and points on visualizer with indices that indicate which
     bbox3d that each point lies in.
     Args:
@@ -303,17 +311,27 @@ def show_pts_index_boxes(points,
     vis = o3d.visualization.Visualizer()
     vis.create_window()
     mesh_frame = geometry.TriangleMesh.create_coordinate_frame(
-        size=1, origin=[0, 0, 0])  # create coordinate frame
+        size=1, origin=[0, 0, 0]
+    )  # create coordinate frame
     vis.add_geometry(mesh_frame)
 
     # draw points
-    pcd, points_colors = _draw_points(points, vis, points_size, point_color,
-                                      mode)
+    pcd, points_colors = _draw_points(points, vis, points_size, point_color, mode)
 
     # draw boxes
     if bbox3d is not None:
-        _draw_bboxes_ind(bbox3d, vis, indices, points_colors, pcd, bbox_color,
-                         points_in_box_color, rot_axis, center_mode, mode)
+        _draw_bboxes_ind(
+            bbox3d,
+            vis,
+            indices,
+            points_colors,
+            pcd,
+            bbox_color,
+            points_in_box_color,
+            rot_axis,
+            center_mode,
+            mode,
+        )
 
     if show:
         vis.run()
@@ -353,17 +371,19 @@ class Visualizer(object):
             available mode ['xyz', 'xyzrgb']. Default: 'xyz'.
     """
 
-    def __init__(self,
-                 points,
-                 bbox3d=None,
-                 save_path=None,
-                 points_size=2,
-                 point_color=(0.5, 0.5, 0.5),
-                 bbox_color=(0, 1, 0),
-                 points_in_box_color=(1, 0, 0),
-                 rot_axis=2,
-                 center_mode='lidar_bottom',
-                 mode='xyz'):
+    def __init__(
+        self,
+        points,
+        bbox3d=None,
+        save_path=None,
+        points_size=2,
+        point_color=(0.5, 0.5, 0.5),
+        bbox_color=(0, 1, 0),
+        points_in_box_color=(1, 0, 0),
+        rot_axis=2,
+        center_mode="lidar_bottom",
+        mode="xyz",
+    ):
         super(Visualizer, self).__init__()
         assert 0 <= rot_axis <= 2
 
@@ -371,7 +391,8 @@ class Visualizer(object):
         self.o3d_visualizer = o3d.visualization.Visualizer()
         self.o3d_visualizer.create_window()
         mesh_frame = geometry.TriangleMesh.create_coordinate_frame(
-            size=1, origin=[0, 0, 0])  # create coordinate frame
+            size=1, origin=[0, 0, 0]
+        )  # create coordinate frame
         self.o3d_visualizer.add_geometry(mesh_frame)
 
         self.points_size = points_size
@@ -386,13 +407,22 @@ class Visualizer(object):
         # draw points
         if points is not None:
             self.pcd, self.points_colors = _draw_points(
-                points, self.o3d_visualizer, points_size, point_color, mode)
+                points, self.o3d_visualizer, points_size, point_color, mode
+            )
 
         # draw boxes
         if bbox3d is not None:
-            _draw_bboxes(bbox3d, self.o3d_visualizer, self.points_colors,
-                         self.pcd, bbox_color, points_in_box_color, rot_axis,
-                         center_mode, mode)
+            _draw_bboxes(
+                bbox3d,
+                self.o3d_visualizer,
+                self.points_colors,
+                self.pcd,
+                bbox_color,
+                points_in_box_color,
+                rot_axis,
+                center_mode,
+                mode,
+            )
 
     def add_bboxes(self, bbox3d, bbox_color=None, points_in_box_color=None):
         """Add bounding box to visualizer.
@@ -410,9 +440,17 @@ class Visualizer(object):
             bbox_color = self.bbox_color
         if points_in_box_color is None:
             points_in_box_color = self.points_in_box_color
-        _draw_bboxes(bbox3d, self.o3d_visualizer, self.points_colors, self.pcd,
-                     bbox_color, points_in_box_color, self.rot_axis,
-                     self.center_mode, self.mode)
+        _draw_bboxes(
+            bbox3d,
+            self.o3d_visualizer,
+            self.points_colors,
+            self.pcd,
+            bbox_color,
+            points_in_box_color,
+            self.rot_axis,
+            self.center_mode,
+            self.mode,
+        )
 
     def add_seg_mask(self, seg_mask_colors):
         """Add segmentation mask to visualizer via per-point colorization.
@@ -425,15 +463,18 @@ class Visualizer(object):
         # in case gt and pred mask would overlap
         # instead we set a large offset along x-axis for each seg mask
         self.seg_num += 1
-        offset = (np.array(self.pcd.points).max(0) -
-                  np.array(self.pcd.points).min(0))[0] * 1.2 * self.seg_num
+        offset = (
+            (np.array(self.pcd.points).max(0) - np.array(self.pcd.points).min(0))[0]
+            * 1.2
+            * self.seg_num
+        )
         mesh_frame = geometry.TriangleMesh.create_coordinate_frame(
-            size=1, origin=[offset, 0, 0])  # create coordinate frame for seg
+            size=1, origin=[offset, 0, 0]
+        )  # create coordinate frame for seg
         self.o3d_visualizer.add_geometry(mesh_frame)
         seg_points = copy.deepcopy(seg_mask_colors)
         seg_points[:, 0] += offset
-        _draw_points(
-            seg_points, self.o3d_visualizer, self.points_size, mode='xyzrgb')
+        _draw_points(seg_points, self.o3d_visualizer, self.points_size, mode="xyzrgb")
 
     def show(self, save_path=None):
         """Visualize the points cloud.

@@ -9,12 +9,5 @@ class NASFCOS(SingleStageDetector):
     https://arxiv.org/abs/1906.0442
     """
 
-    def __init__(self,
-                 backbone,
-                 neck,
-                 bbox_head,
-                 train_cfg=None,
-                 test_cfg=None,
-                 pretrained=None):
-        super(NASFCOS, self).__init__(backbone, neck, bbox_head, train_cfg,
-                                      test_cfg, pretrained)
+    def __init__(self, backbone, neck, bbox_head, train_cfg=None, test_cfg=None, pretrained=None):
+        super(NASFCOS, self).__init__(backbone, neck, bbox_head, train_cfg, test_cfg, pretrained)

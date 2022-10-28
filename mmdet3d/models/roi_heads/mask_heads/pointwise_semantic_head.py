@@ -23,22 +23,22 @@ class PointwiseSemanticHead(nn.Module):
         loss_part (dict): Config of part prediction loss.
     """
 
-    def __init__(self,
-                 in_channels,
-                 num_classes=3,
-                 extra_width=0.2,
-                 seg_score_thr=0.3,
-                 loss_seg=dict(
-                     type='FocalLoss',
-                     use_sigmoid=True,
-                     reduction='sum',
-                     gamma=2.0,
-                     alpha=0.25,
-                     loss_weight=1.0),
-                 loss_part=dict(
-                     type='CrossEntropyLoss',
-                     use_sigmoid=True,
-                     loss_weight=1.0)):
+    def __init__(
+        self,
+        in_channels,
+        num_classes=3,
+        extra_width=0.2,
+        seg_score_thr=0.3,
+        loss_seg=dict(
+            type="FocalLoss",
+            use_sigmoid=True,
+            reduction="sum",
+            gamma=2.0,
+            alpha=0.25,
+            loss_weight=1.0,
+        ),
+        loss_part=dict(type="CrossEntropyLoss", use_sigmoid=True, loss_weight=1.0),
+    ):
         super(PointwiseSemanticHead, self).__init__()
         self.extra_width = extra_width
         self.num_classes = num_classes
@@ -66,14 +66,12 @@ class PointwiseSemanticHead(nn.Module):
         part_preds = self.seg_reg_layer(x)  # (N, 3)
 
         seg_scores = torch.sigmoid(seg_preds).detach()
-        seg_mask = (seg_scores > self.seg_score_thr)
+        seg_mask = seg_scores > self.seg_score_thr
 
         part_offsets = torch.sigmoid(part_preds).clone().detach()
         part_offsets[seg_mask.view(-1) == 0] = 0
-        part_feats = torch.cat((part_offsets, seg_scores),
-                               dim=-1)  # shape (npoints, 4)
-        return dict(
-            seg_preds=seg_preds, part_preds=part_preds, part_feats=part_feats)
+        part_feats = torch.cat((part_offsets, seg_scores), dim=-1)  # shape (npoints, 4)
+        return dict(seg_preds=seg_preds, part_preds=part_preds, part_feats=part_feats)
 
     def get_targets_single(self, voxel_centers, gt_bboxes_3d, gt_labels_3d):
         """generate segmentation and part prediction targets for a single
@@ -94,14 +92,11 @@ class PointwiseSemanticHead(nn.Module):
         gt_bboxes_3d = gt_bboxes_3d.to(voxel_centers.device)
         enlarged_gt_boxes = gt_bboxes_3d.enlarged_box(self.extra_width)
 
-        part_targets = voxel_centers.new_zeros((voxel_centers.shape[0], 3),
-                                               dtype=torch.float32)
+        part_targets = voxel_centers.new_zeros((voxel_centers.shape[0], 3), dtype=torch.float32)
         box_idx = gt_bboxes_3d.points_in_boxes(voxel_centers)
-        enlarge_box_idx = enlarged_gt_boxes.points_in_boxes(
-            voxel_centers).long()
+        enlarge_box_idx = enlarged_gt_boxes.points_in_boxes(voxel_centers).long()
 
-        gt_labels_pad = F.pad(
-            gt_labels_3d, (1, 0), mode='constant', value=self.num_classes)
+        gt_labels_pad = F.pad(gt_labels_3d, (1, 0), mode="constant", value=self.num_classes)
         seg_targets = gt_labels_pad[(box_idx.long() + 1)]
         fg_pt_flag = box_idx > -1
         ignore_flag = fg_pt_flag ^ (enlarge_box_idx > -1)
@@ -115,11 +110,11 @@ class PointwiseSemanticHead(nn.Module):
             fg_voxels = voxel_centers[k_box_flag]
             transformed_voxels = fg_voxels - gt_bboxes_3d.bottom_center[k]
             transformed_voxels = rotation_3d_in_axis(
-                transformed_voxels.unsqueeze(0),
-                -gt_bboxes_3d.yaw[k].view(1),
-                axis=2)
+                transformed_voxels.unsqueeze(0), -gt_bboxes_3d.yaw[k].view(1), axis=2
+            )
             part_targets[k_box_flag] = transformed_voxels / gt_bboxes_3d.dims[
-                k] + voxel_centers.new_tensor([0.5, 0.5, 0])
+                k
+            ] + voxel_centers.new_tensor([0.5, 0.5, 0])
 
         part_targets = torch.clamp(part_targets, min=0)
         return seg_targets, part_targets
@@ -146,12 +141,12 @@ class PointwiseSemanticHead(nn.Module):
         batch_size = len(gt_labels_3d)
         voxel_center_list = []
         for idx in range(batch_size):
-            coords_idx = voxels_dict['coors'][:, 0] == idx
-            voxel_center_list.append(voxels_dict['voxel_centers'][coords_idx])
+            coords_idx = voxels_dict["coors"][:, 0] == idx
+            voxel_center_list.append(voxels_dict["voxel_centers"][coords_idx])
 
-        seg_targets, part_targets = multi_apply(self.get_targets_single,
-                                                voxel_center_list,
-                                                gt_bboxes_3d, gt_labels_3d)
+        seg_targets, part_targets = multi_apply(
+            self.get_targets_single, voxel_center_list, gt_bboxes_3d, gt_labels_3d
+        )
         seg_targets = torch.cat(seg_targets, dim=0)
         part_targets = torch.cat(part_targets, dim=0)
         return dict(seg_targets=seg_targets, part_targets=part_targets)
@@ -176,10 +171,10 @@ class PointwiseSemanticHead(nn.Module):
                 - loss_seg (torch.Tensor): Segmentation prediction loss.
                 - loss_part (torch.Tensor): Part prediction loss.
         """
-        seg_preds = semantic_results['seg_preds']
-        part_preds = semantic_results['part_preds']
-        seg_targets = semantic_targets['seg_targets']
-        part_targets = semantic_targets['part_targets']
+        seg_preds = semantic_results["seg_preds"]
+        part_preds = semantic_results["part_preds"]
+        seg_targets = semantic_targets["seg_targets"]
+        part_targets = semantic_targets["part_targets"]
 
         pos_mask = (seg_targets > -1) & (seg_targets < self.num_classes)
         binary_seg_target = pos_mask.long()
@@ -191,8 +186,7 @@ class PointwiseSemanticHead(nn.Module):
         loss_seg = self.loss_seg(seg_preds, binary_seg_target, seg_weights)
 
         if pos_normalizer > 0:
-            loss_part = self.loss_part(part_preds[pos_mask],
-                                       part_targets[pos_mask])
+            loss_part = self.loss_part(part_preds[pos_mask], part_targets[pos_mask])
         else:
             # fake a part loss
             loss_part = loss_seg.new_tensor(0)

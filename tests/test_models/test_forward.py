@@ -18,16 +18,18 @@ def _get_config_directory():
     except NameError:
         # For IPython development when this __file__ is not defined
         import mmdet3d
+
         repo_dpath = dirname(dirname(mmdet3d.__file__))
-    config_dpath = join(repo_dpath, 'configs')
+    config_dpath = join(repo_dpath, "configs")
     if not exists(config_dpath):
-        raise Exception('Cannot find config path')
+        raise Exception("Cannot find config path")
     return config_dpath
 
 
 def _get_config_module(fname):
     """Load a configuration as a python module."""
     from mmcv import Config
+
     config_dpath = _get_config_directory()
     config_fpath = join(config_dpath, fname)
     config_mod = Config.fromfile(config_fpath)
@@ -47,27 +49,29 @@ def _get_detector_cfg(fname):
 
 def _test_two_stage_forward(cfg_file):
     model = _get_detector_cfg(cfg_file)
-    model['pretrained'] = None
+    model["pretrained"] = None
 
     from mmdet.models import build_detector
+
     detector = build_detector(model)
 
     input_shape = (1, 3, 256, 256)
 
     # Test forward train with a non-empty truth batch
     mm_inputs = _demo_mm_inputs(input_shape, num_items=[10])
-    imgs = mm_inputs.pop('imgs')
-    img_metas = mm_inputs.pop('img_metas')
-    gt_bboxes = mm_inputs['gt_bboxes']
-    gt_labels = mm_inputs['gt_labels']
-    gt_masks = mm_inputs['gt_masks']
+    imgs = mm_inputs.pop("imgs")
+    img_metas = mm_inputs.pop("img_metas")
+    gt_bboxes = mm_inputs["gt_bboxes"]
+    gt_labels = mm_inputs["gt_labels"]
+    gt_masks = mm_inputs["gt_masks"]
     losses = detector.forward(
         imgs,
         img_metas,
         gt_bboxes=gt_bboxes,
         gt_labels=gt_labels,
         gt_masks=gt_masks,
-        return_loss=True)
+        return_loss=True,
+    )
     assert isinstance(losses, dict)
     loss, _ = detector._parse_losses(losses)
     loss.requires_grad_(True)
@@ -76,18 +80,19 @@ def _test_two_stage_forward(cfg_file):
 
     # Test forward train with an empty truth batch
     mm_inputs = _demo_mm_inputs(input_shape, num_items=[0])
-    imgs = mm_inputs.pop('imgs')
-    img_metas = mm_inputs.pop('img_metas')
-    gt_bboxes = mm_inputs['gt_bboxes']
-    gt_labels = mm_inputs['gt_labels']
-    gt_masks = mm_inputs['gt_masks']
+    imgs = mm_inputs.pop("imgs")
+    img_metas = mm_inputs.pop("img_metas")
+    gt_bboxes = mm_inputs["gt_bboxes"]
+    gt_labels = mm_inputs["gt_labels"]
+    gt_masks = mm_inputs["gt_masks"]
     losses = detector.forward(
         imgs,
         img_metas,
         gt_bboxes=gt_bboxes,
         gt_labels=gt_labels,
         gt_masks=gt_masks,
-        return_loss=True)
+        return_loss=True,
+    )
     assert isinstance(losses, dict)
     loss, _ = detector._parse_losses(losses)
     assert float(loss.item()) > 0
@@ -98,33 +103,30 @@ def _test_two_stage_forward(cfg_file):
         img_list = [g[None, :] for g in imgs]
         batch_results = []
         for one_img, one_meta in zip(img_list, img_metas):
-            result = detector.forward([one_img], [[one_meta]],
-                                      return_loss=False)
+            result = detector.forward([one_img], [[one_meta]], return_loss=False)
             batch_results.append(result)
 
 
 def _test_single_stage_forward(cfg_file):
     model = _get_detector_cfg(cfg_file)
-    model['pretrained'] = None
+    model["pretrained"] = None
 
     from mmdet.models import build_detector
+
     detector = build_detector(model)
 
     input_shape = (1, 3, 300, 300)
     mm_inputs = _demo_mm_inputs(input_shape)
 
-    imgs = mm_inputs.pop('imgs')
-    img_metas = mm_inputs.pop('img_metas')
+    imgs = mm_inputs.pop("imgs")
+    img_metas = mm_inputs.pop("img_metas")
 
     # Test forward train
-    gt_bboxes = mm_inputs['gt_bboxes']
-    gt_labels = mm_inputs['gt_labels']
+    gt_bboxes = mm_inputs["gt_bboxes"]
+    gt_labels = mm_inputs["gt_labels"]
     losses = detector.forward(
-        imgs,
-        img_metas,
-        gt_bboxes=gt_bboxes,
-        gt_labels=gt_labels,
-        return_loss=True)
+        imgs, img_metas, gt_bboxes=gt_bboxes, gt_labels=gt_labels, return_loss=True
+    )
     assert isinstance(losses, dict)
     loss, _ = detector._parse_losses(losses)
     assert float(loss.item()) > 0
@@ -134,13 +136,11 @@ def _test_single_stage_forward(cfg_file):
         img_list = [g[None, :] for g in imgs]
         batch_results = []
         for one_img, one_meta in zip(img_list, img_metas):
-            result = detector.forward([one_img], [[one_meta]],
-                                      return_loss=False)
+            result = detector.forward([one_img], [[one_meta]], return_loss=False)
             batch_results.append(result)
 
 
-def _demo_mm_inputs(input_shape=(1, 3, 300, 300),
-                    num_items=None, num_classes=10):  # yapf: disable
+def _demo_mm_inputs(input_shape=(1, 3, 300, 300), num_items=None, num_classes=10):  # yapf: disable
     """Create a superset of inputs needed to run test or train batches.
 
     Args:
@@ -161,14 +161,17 @@ def _demo_mm_inputs(input_shape=(1, 3, 300, 300),
 
     imgs = rng.rand(*input_shape)
 
-    img_metas = [{
-        'img_shape': (H, W, C),
-        'ori_shape': (H, W, C),
-        'pad_shape': (H, W, C),
-        'filename': '<demo>.png',
-        'scale_factor': 1.0,
-        'flip': False,
-    } for _ in range(N)]
+    img_metas = [
+        {
+            "img_shape": (H, W, C),
+            "ori_shape": (H, W, C),
+            "pad_shape": (H, W, C),
+            "filename": "<demo>.png",
+            "scale_factor": 1.0,
+            "flip": False,
+        }
+        for _ in range(N)
+    ]
 
     gt_bboxes = []
     gt_labels = []
@@ -197,11 +200,11 @@ def _demo_mm_inputs(input_shape=(1, 3, 300, 300),
     gt_masks.append(BitmapMasks(mask, H, W))
 
     mm_inputs = {
-        'imgs': torch.FloatTensor(imgs).requires_grad_(True),
-        'img_metas': img_metas,
-        'gt_bboxes': gt_bboxes,
-        'gt_labels': gt_labels,
-        'gt_bboxes_ignore': None,
-        'gt_masks': gt_masks,
+        "imgs": torch.FloatTensor(imgs).requires_grad_(True),
+        "img_metas": img_metas,
+        "gt_bboxes": gt_bboxes,
+        "gt_labels": gt_labels,
+        "gt_bboxes_ignore": None,
+        "gt_masks": gt_masks,
     }
     return mm_inputs

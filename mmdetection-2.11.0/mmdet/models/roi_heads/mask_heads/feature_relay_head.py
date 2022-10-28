@@ -18,11 +18,7 @@ class FeatureRelayHead(nn.Module):
             at mask head. Default: 2.
     """
 
-    def __init__(self,
-                 in_channels=1024,
-                 out_conv_channels=256,
-                 roi_feat_size=7,
-                 scale_factor=2):
+    def __init__(self, in_channels=1024, out_conv_channels=256, roi_feat_size=7, scale_factor=2):
         super(FeatureRelayHead, self).__init__()
         assert isinstance(roi_feat_size, int)
 
@@ -34,8 +30,7 @@ class FeatureRelayHead(nn.Module):
         self.fp16_enabled = False
 
         self.fc = nn.Linear(self.in_channels, self.out_channels)
-        self.upsample = nn.Upsample(
-            scale_factor=scale_factor, mode='bilinear', align_corners=True)
+        self.upsample = nn.Upsample(scale_factor=scale_factor, mode="bilinear", align_corners=True)
 
     def init_weights(self):
         """Init weights for the head."""

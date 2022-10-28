@@ -40,7 +40,7 @@ class DynamicMVXFasterRCNN(MVXTwoStageDetector):
         points = torch.cat(points, dim=0)
         coors_batch = []
         for i, coor in enumerate(coors):
-            coor_pad = F.pad(coor, (1, 0), mode='constant', value=i)
+            coor_pad = F.pad(coor, (1, 0), mode="constant", value=i)
             coors_batch.append(coor_pad)
         coors_batch = torch.cat(coors_batch, dim=0)
         return points, coors_batch
@@ -51,7 +51,8 @@ class DynamicMVXFasterRCNN(MVXTwoStageDetector):
             return None
         voxels, coors = self.voxelize(points)
         voxel_features, feature_coors = self.pts_voxel_encoder(
-            voxels, coors, points, img_feats, img_metas)
+            voxels, coors, points, img_feats, img_metas
+        )
         batch_size = coors[-1, 0] + 1
         x = self.pts_middle_encoder(voxel_features, feature_coors, batch_size)
         x = self.pts_backbone(x)

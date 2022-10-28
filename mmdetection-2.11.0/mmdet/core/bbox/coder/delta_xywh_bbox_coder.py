@@ -23,10 +23,9 @@ class DeltaXYWHBBoxCoder(BaseBBoxCoder):
             border of the image. Defaults to True.
     """
 
-    def __init__(self,
-                 target_means=(0., 0., 0., 0.),
-                 target_stds=(1., 1., 1., 1.),
-                 clip_border=True):
+    def __init__(
+        self, target_means=(0.0, 0.0, 0.0, 0.0), target_stds=(1.0, 1.0, 1.0, 1.0), clip_border=True
+    ):
         super(BaseBBoxCoder, self).__init__()
         self.means = target_means
         self.stds = target_stds
@@ -50,11 +49,7 @@ class DeltaXYWHBBoxCoder(BaseBBoxCoder):
         encoded_bboxes = bbox2delta(bboxes, gt_bboxes, self.means, self.stds)
         return encoded_bboxes
 
-    def decode(self,
-               bboxes,
-               pred_bboxes,
-               max_shape=None,
-               wh_ratio_clip=16 / 1000):
+    def decode(self, bboxes, pred_bboxes, max_shape=None, wh_ratio_clip=16 / 1000):
         """Apply transformation `pred_bboxes` to `boxes`.
 
         Args:
@@ -78,14 +73,15 @@ class DeltaXYWHBBoxCoder(BaseBBoxCoder):
         assert pred_bboxes.size(0) == bboxes.size(0)
         if pred_bboxes.ndim == 3:
             assert pred_bboxes.size(1) == bboxes.size(1)
-        decoded_bboxes = delta2bbox(bboxes, pred_bboxes, self.means, self.stds,
-                                    max_shape, wh_ratio_clip, self.clip_border)
+        decoded_bboxes = delta2bbox(
+            bboxes, pred_bboxes, self.means, self.stds, max_shape, wh_ratio_clip, self.clip_border
+        )
 
         return decoded_bboxes
 
 
 @mmcv.jit(coderize=True)
-def bbox2delta(proposals, gt, means=(0., 0., 0., 0.), stds=(1., 1., 1., 1.)):
+def bbox2delta(proposals, gt, means=(0.0, 0.0, 0.0, 0.0), stds=(1.0, 1.0, 1.0, 1.0)):
     """Compute deltas of proposals w.r.t. gt.
 
     We usually compute the deltas of x, y, w, h of proposals w.r.t ground
@@ -131,13 +127,15 @@ def bbox2delta(proposals, gt, means=(0., 0., 0., 0.), stds=(1., 1., 1., 1.)):
 
 
 @mmcv.jit(coderize=True)
-def delta2bbox(rois,
-               deltas,
-               means=(0., 0., 0., 0.),
-               stds=(1., 1., 1., 1.),
-               max_shape=None,
-               wh_ratio_clip=16 / 1000,
-               clip_border=True):
+def delta2bbox(
+    rois,
+    deltas,
+    means=(0.0, 0.0, 0.0, 0.0),
+    stds=(1.0, 1.0, 1.0, 1.0),
+    max_shape=None,
+    wh_ratio_clip=16 / 1000,
+    clip_border=True,
+):
     """Apply deltas to shift/scale base boxes.
 
     Typically the rois are anchor or proposed bounding boxes and the deltas are
@@ -185,9 +183,7 @@ def delta2bbox(rois,
                 [0.0000, 0.3161, 4.1945, 0.6839],
                 [5.0000, 5.0000, 5.0000, 5.0000]])
     """
-    means = deltas.new_tensor(means).view(1,
-                                          -1).repeat(1,
-                                                     deltas.size(-1) // 4)
+    means = deltas.new_tensor(means).view(1, -1).repeat(1, deltas.size(-1) // 4)
     stds = deltas.new_tensor(stds).view(1, -1).repeat(1, deltas.size(-1) // 4)
     denorm_deltas = deltas * stds + means
     dx = denorm_deltas[..., 0::4]
@@ -228,9 +224,7 @@ def delta2bbox(rois,
             assert max_shape.size(0) == bboxes.size(0)
 
         min_xy = x1.new_tensor(0)
-        max_xy = torch.cat(
-            [max_shape] * (deltas.size(-1) // 2),
-            dim=-1).flip(-1).unsqueeze(-2)
+        max_xy = torch.cat([max_shape] * (deltas.size(-1) // 2), dim=-1).flip(-1).unsqueeze(-2)
         bboxes = torch.where(bboxes < min_xy, min_xy, bboxes)
         bboxes = torch.where(bboxes > max_xy, max_xy, bboxes)
 

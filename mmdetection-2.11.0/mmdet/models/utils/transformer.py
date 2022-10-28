@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
-from mmcv.cnn import (Linear, build_activation_layer, build_norm_layer,
-                      xavier_init)
+from mmcv.cnn import Linear, build_activation_layer, build_norm_layer, xavier_init
 
 from .builder import TRANSFORMER
 
@@ -21,23 +20,26 @@ class MultiheadAttention(nn.Module):
 
     def __init__(self, embed_dims, num_heads, dropout=0.0):
         super(MultiheadAttention, self).__init__()
-        assert embed_dims % num_heads == 0, 'embed_dims must be ' \
-            f'divisible by num_heads. got {embed_dims} and {num_heads}.'
+        assert embed_dims % num_heads == 0, (
+            "embed_dims must be " f"divisible by num_heads. got {embed_dims} and {num_heads}."
+        )
         self.embed_dims = embed_dims
         self.num_heads = num_heads
         self.dropout = dropout
         self.attn = nn.MultiheadAttention(embed_dims, num_heads, dropout)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self,
-                x,
-                key=None,
-                value=None,
-                residual=None,
-                query_pos=None,
-                key_pos=None,
-                attn_mask=None,
-                key_padding_mask=None):
+    def forward(
+        self,
+        x,
+        key=None,
+        value=None,
+        residual=None,
+        query_pos=None,
+        key_pos=None,
+        attn_mask=None,
+        key_padding_mask=None,
+    ):
         """Forward function for `MultiheadAttention`.
 
         Args:
@@ -84,20 +86,17 @@ class MultiheadAttention(nn.Module):
         if key_pos is not None:
             key = key + key_pos
         out = self.attn(
-            query,
-            key,
-            value=value,
-            attn_mask=attn_mask,
-            key_padding_mask=key_padding_mask)[0]
+            query, key, value=value, attn_mask=attn_mask, key_padding_mask=key_padding_mask
+        )[0]
 
         return residual + self.dropout(out)
 
     def __repr__(self):
         """str: a string that describes the module"""
         repr_str = self.__class__.__name__
-        repr_str += f'(embed_dims={self.embed_dims}, '
-        repr_str += f'num_heads={self.num_heads}, '
-        repr_str += f'dropout={self.dropout})'
+        repr_str += f"(embed_dims={self.embed_dims}, "
+        repr_str += f"num_heads={self.num_heads}, "
+        repr_str += f"dropout={self.dropout})"
         return repr_str
 
 
@@ -117,16 +116,17 @@ class FFN(nn.Module):
             Defaults to True.
     """
 
-    def __init__(self,
-                 embed_dims,
-                 feedforward_channels,
-                 num_fcs=2,
-                 act_cfg=dict(type='ReLU', inplace=True),
-                 dropout=0.0,
-                 add_residual=True):
+    def __init__(
+        self,
+        embed_dims,
+        feedforward_channels,
+        num_fcs=2,
+        act_cfg=dict(type="ReLU", inplace=True),
+        dropout=0.0,
+        add_residual=True,
+    ):
         super(FFN, self).__init__()
-        assert num_fcs >= 2, 'num_fcs should be no less ' \
-            f'than 2. got {num_fcs}.'
+        assert num_fcs >= 2, "num_fcs should be no less " f"than 2. got {num_fcs}."
         self.embed_dims = embed_dims
         self.feedforward_channels = feedforward_channels
         self.num_fcs = num_fcs
@@ -139,8 +139,9 @@ class FFN(nn.Module):
         for _ in range(num_fcs - 1):
             layers.append(
                 nn.Sequential(
-                    Linear(in_channels, feedforward_channels), self.activate,
-                    nn.Dropout(dropout)))
+                    Linear(in_channels, feedforward_channels), self.activate, nn.Dropout(dropout)
+                )
+            )
             in_channels = feedforward_channels
         layers.append(Linear(feedforward_channels, embed_dims))
         self.layers = nn.Sequential(*layers)
@@ -159,12 +160,12 @@ class FFN(nn.Module):
     def __repr__(self):
         """str: a string that describes the module"""
         repr_str = self.__class__.__name__
-        repr_str += f'(embed_dims={self.embed_dims}, '
-        repr_str += f'feedforward_channels={self.feedforward_channels}, '
-        repr_str += f'num_fcs={self.num_fcs}, '
-        repr_str += f'act_cfg={self.act_cfg}, '
-        repr_str += f'dropout={self.dropout}, '
-        repr_str += f'add_residual={self.add_residual})'
+        repr_str += f"(embed_dims={self.embed_dims}, "
+        repr_str += f"feedforward_channels={self.feedforward_channels}, "
+        repr_str += f"num_fcs={self.num_fcs}, "
+        repr_str += f"act_cfg={self.act_cfg}, "
+        repr_str += f"dropout={self.dropout}, "
+        repr_str += f"add_residual={self.add_residual})"
         return repr_str
 
 
@@ -186,18 +187,20 @@ class TransformerEncoderLayer(nn.Module):
             Default 2.
     """
 
-    def __init__(self,
-                 embed_dims,
-                 num_heads,
-                 feedforward_channels,
-                 dropout=0.0,
-                 order=('selfattn', 'norm', 'ffn', 'norm'),
-                 act_cfg=dict(type='ReLU', inplace=True),
-                 norm_cfg=dict(type='LN'),
-                 num_fcs=2):
+    def __init__(
+        self,
+        embed_dims,
+        num_heads,
+        feedforward_channels,
+        dropout=0.0,
+        order=("selfattn", "norm", "ffn", "norm"),
+        act_cfg=dict(type="ReLU", inplace=True),
+        norm_cfg=dict(type="LN"),
+        num_fcs=2,
+    ):
         super(TransformerEncoderLayer, self).__init__()
         assert isinstance(order, tuple) and len(order) == 4
-        assert set(order) == set(['selfattn', 'norm', 'ffn'])
+        assert set(order) == set(["selfattn", "norm", "ffn"])
         self.embed_dims = embed_dims
         self.num_heads = num_heads
         self.feedforward_channels = feedforward_channels
@@ -206,10 +209,9 @@ class TransformerEncoderLayer(nn.Module):
         self.act_cfg = act_cfg
         self.norm_cfg = norm_cfg
         self.num_fcs = num_fcs
-        self.pre_norm = order[0] == 'norm'
+        self.pre_norm = order[0] == "norm"
         self.self_attn = MultiheadAttention(embed_dims, num_heads, dropout)
-        self.ffn = FFN(embed_dims, feedforward_channels, num_fcs, act_cfg,
-                       dropout)
+        self.ffn = FFN(embed_dims, feedforward_channels, num_fcs, act_cfg, dropout)
         self.norms = nn.ModuleList()
         self.norms.append(build_norm_layer(norm_cfg, embed_dims)[1])
         self.norms.append(build_norm_layer(norm_cfg, embed_dims)[1])
@@ -233,7 +235,7 @@ class TransformerEncoderLayer(nn.Module):
         norm_cnt = 0
         inp_residual = x
         for layer in self.order:
-            if layer == 'selfattn':
+            if layer == "selfattn":
                 # self attention
                 query = key = value = x
                 x = self.self_attn(
@@ -244,26 +246,27 @@ class TransformerEncoderLayer(nn.Module):
                     query_pos=pos,
                     key_pos=pos,
                     attn_mask=attn_mask,
-                    key_padding_mask=key_padding_mask)
+                    key_padding_mask=key_padding_mask,
+                )
                 inp_residual = x
-            elif layer == 'norm':
+            elif layer == "norm":
                 x = self.norms[norm_cnt](x)
                 norm_cnt += 1
-            elif layer == 'ffn':
+            elif layer == "ffn":
                 x = self.ffn(x, inp_residual if self.pre_norm else None)
         return x
 
     def __repr__(self):
         """str: a string that describes the module"""
         repr_str = self.__class__.__name__
-        repr_str += f'(embed_dims={self.embed_dims}, '
-        repr_str += f'num_heads={self.num_heads}, '
-        repr_str += f'feedforward_channels={self.feedforward_channels}, '
-        repr_str += f'dropout={self.dropout}, '
-        repr_str += f'order={self.order}, '
-        repr_str += f'act_cfg={self.act_cfg}, '
-        repr_str += f'norm_cfg={self.norm_cfg}, '
-        repr_str += f'num_fcs={self.num_fcs})'
+        repr_str += f"(embed_dims={self.embed_dims}, "
+        repr_str += f"num_heads={self.num_heads}, "
+        repr_str += f"feedforward_channels={self.feedforward_channels}, "
+        repr_str += f"dropout={self.dropout}, "
+        repr_str += f"order={self.order}, "
+        repr_str += f"act_cfg={self.act_cfg}, "
+        repr_str += f"norm_cfg={self.norm_cfg}, "
+        repr_str += f"num_fcs={self.num_fcs})"
         return repr_str
 
 
@@ -286,19 +289,20 @@ class TransformerDecoderLayer(nn.Module):
         num_fcs (int): The number of fully-connected layers in FFNs.
     """
 
-    def __init__(self,
-                 embed_dims,
-                 num_heads,
-                 feedforward_channels,
-                 dropout=0.0,
-                 order=('selfattn', 'norm', 'multiheadattn', 'norm', 'ffn',
-                        'norm'),
-                 act_cfg=dict(type='ReLU', inplace=True),
-                 norm_cfg=dict(type='LN'),
-                 num_fcs=2):
+    def __init__(
+        self,
+        embed_dims,
+        num_heads,
+        feedforward_channels,
+        dropout=0.0,
+        order=("selfattn", "norm", "multiheadattn", "norm", "ffn", "norm"),
+        act_cfg=dict(type="ReLU", inplace=True),
+        norm_cfg=dict(type="LN"),
+        num_fcs=2,
+    ):
         super(TransformerDecoderLayer, self).__init__()
         assert isinstance(order, tuple) and len(order) == 6
-        assert set(order) == set(['selfattn', 'norm', 'multiheadattn', 'ffn'])
+        assert set(order) == set(["selfattn", "norm", "multiheadattn", "ffn"])
         self.embed_dims = embed_dims
         self.num_heads = num_heads
         self.feedforward_channels = feedforward_channels
@@ -307,26 +311,26 @@ class TransformerDecoderLayer(nn.Module):
         self.act_cfg = act_cfg
         self.norm_cfg = norm_cfg
         self.num_fcs = num_fcs
-        self.pre_norm = order[0] == 'norm'
+        self.pre_norm = order[0] == "norm"
         self.self_attn = MultiheadAttention(embed_dims, num_heads, dropout)
-        self.multihead_attn = MultiheadAttention(embed_dims, num_heads,
-                                                 dropout)
-        self.ffn = FFN(embed_dims, feedforward_channels, num_fcs, act_cfg,
-                       dropout)
+        self.multihead_attn = MultiheadAttention(embed_dims, num_heads, dropout)
+        self.ffn = FFN(embed_dims, feedforward_channels, num_fcs, act_cfg, dropout)
         self.norms = nn.ModuleList()
         # 3 norm layers in official DETR's TransformerDecoderLayer
         for _ in range(3):
             self.norms.append(build_norm_layer(norm_cfg, embed_dims)[1])
 
-    def forward(self,
-                x,
-                memory,
-                memory_pos=None,
-                query_pos=None,
-                memory_attn_mask=None,
-                target_attn_mask=None,
-                memory_key_padding_mask=None,
-                target_key_padding_mask=None):
+    def forward(
+        self,
+        x,
+        memory,
+        memory_pos=None,
+        query_pos=None,
+        memory_attn_mask=None,
+        target_attn_mask=None,
+        memory_key_padding_mask=None,
+        target_key_padding_mask=None,
+    ):
         """Forward function for `TransformerDecoderLayer`.
 
         Args:
@@ -356,7 +360,7 @@ class TransformerDecoderLayer(nn.Module):
         norm_cnt = 0
         inp_residual = x
         for layer in self.order:
-            if layer == 'selfattn':
+            if layer == "selfattn":
                 query = key = value = x
                 x = self.self_attn(
                     query,
@@ -366,12 +370,13 @@ class TransformerDecoderLayer(nn.Module):
                     query_pos,
                     key_pos=query_pos,
                     attn_mask=target_attn_mask,
-                    key_padding_mask=target_key_padding_mask)
+                    key_padding_mask=target_key_padding_mask,
+                )
                 inp_residual = x
-            elif layer == 'norm':
+            elif layer == "norm":
                 x = self.norms[norm_cnt](x)
                 norm_cnt += 1
-            elif layer == 'multiheadattn':
+            elif layer == "multiheadattn":
                 query = x
                 key = value = memory
                 x = self.multihead_attn(
@@ -382,23 +387,24 @@ class TransformerDecoderLayer(nn.Module):
                     query_pos,
                     key_pos=memory_pos,
                     attn_mask=memory_attn_mask,
-                    key_padding_mask=memory_key_padding_mask)
+                    key_padding_mask=memory_key_padding_mask,
+                )
                 inp_residual = x
-            elif layer == 'ffn':
+            elif layer == "ffn":
                 x = self.ffn(x, inp_residual if self.pre_norm else None)
         return x
 
     def __repr__(self):
         """str: a string that describes the module"""
         repr_str = self.__class__.__name__
-        repr_str += f'(embed_dims={self.embed_dims}, '
-        repr_str += f'num_heads={self.num_heads}, '
-        repr_str += f'feedforward_channels={self.feedforward_channels}, '
-        repr_str += f'dropout={self.dropout}, '
-        repr_str += f'order={self.order}, '
-        repr_str += f'act_cfg={self.act_cfg}, '
-        repr_str += f'norm_cfg={self.norm_cfg}, '
-        repr_str += f'num_fcs={self.num_fcs})'
+        repr_str += f"(embed_dims={self.embed_dims}, "
+        repr_str += f"num_heads={self.num_heads}, "
+        repr_str += f"feedforward_channels={self.feedforward_channels}, "
+        repr_str += f"dropout={self.dropout}, "
+        repr_str += f"order={self.order}, "
+        repr_str += f"act_cfg={self.act_cfg}, "
+        repr_str += f"norm_cfg={self.norm_cfg}, "
+        repr_str += f"num_fcs={self.num_fcs})"
         return repr_str
 
 
@@ -418,19 +424,21 @@ class TransformerEncoder(nn.Module):
         num_fcs (int): Same as `TransformerEncoderLayer`. Default 2.
     """
 
-    def __init__(self,
-                 num_layers,
-                 embed_dims,
-                 num_heads,
-                 feedforward_channels,
-                 dropout=0.0,
-                 order=('selfattn', 'norm', 'ffn', 'norm'),
-                 act_cfg=dict(type='ReLU', inplace=True),
-                 norm_cfg=dict(type='LN'),
-                 num_fcs=2):
+    def __init__(
+        self,
+        num_layers,
+        embed_dims,
+        num_heads,
+        feedforward_channels,
+        dropout=0.0,
+        order=("selfattn", "norm", "ffn", "norm"),
+        act_cfg=dict(type="ReLU", inplace=True),
+        norm_cfg=dict(type="LN"),
+        num_fcs=2,
+    ):
         super(TransformerEncoder, self).__init__()
         assert isinstance(order, tuple) and len(order) == 4
-        assert set(order) == set(['selfattn', 'norm', 'ffn'])
+        assert set(order) == set(["selfattn", "norm", "ffn"])
         self.num_layers = num_layers
         self.embed_dims = embed_dims
         self.num_heads = num_heads
@@ -440,15 +448,22 @@ class TransformerEncoder(nn.Module):
         self.act_cfg = act_cfg
         self.norm_cfg = norm_cfg
         self.num_fcs = num_fcs
-        self.pre_norm = order[0] == 'norm'
+        self.pre_norm = order[0] == "norm"
         self.layers = nn.ModuleList()
         for _ in range(num_layers):
             self.layers.append(
-                TransformerEncoderLayer(embed_dims, num_heads,
-                                        feedforward_channels, dropout, order,
-                                        act_cfg, norm_cfg, num_fcs))
-        self.norm = build_norm_layer(norm_cfg,
-                                     embed_dims)[1] if self.pre_norm else None
+                TransformerEncoderLayer(
+                    embed_dims,
+                    num_heads,
+                    feedforward_channels,
+                    dropout,
+                    order,
+                    act_cfg,
+                    norm_cfg,
+                    num_fcs,
+                )
+            )
+        self.norm = build_norm_layer(norm_cfg, embed_dims)[1] if self.pre_norm else None
 
     def forward(self, x, pos=None, attn_mask=None, key_padding_mask=None):
         """Forward function for `TransformerEncoder`.
@@ -474,15 +489,15 @@ class TransformerEncoder(nn.Module):
     def __repr__(self):
         """str: a string that describes the module"""
         repr_str = self.__class__.__name__
-        repr_str += f'(num_layers={self.num_layers}, '
-        repr_str += f'embed_dims={self.embed_dims}, '
-        repr_str += f'num_heads={self.num_heads}, '
-        repr_str += f'feedforward_channels={self.feedforward_channels}, '
-        repr_str += f'dropout={self.dropout}, '
-        repr_str += f'order={self.order}, '
-        repr_str += f'act_cfg={self.act_cfg}, '
-        repr_str += f'norm_cfg={self.norm_cfg}, '
-        repr_str += f'num_fcs={self.num_fcs})'
+        repr_str += f"(num_layers={self.num_layers}, "
+        repr_str += f"embed_dims={self.embed_dims}, "
+        repr_str += f"num_heads={self.num_heads}, "
+        repr_str += f"feedforward_channels={self.feedforward_channels}, "
+        repr_str += f"dropout={self.dropout}, "
+        repr_str += f"order={self.order}, "
+        repr_str += f"act_cfg={self.act_cfg}, "
+        repr_str += f"norm_cfg={self.norm_cfg}, "
+        repr_str += f"num_fcs={self.num_fcs})"
         return repr_str
 
 
@@ -502,21 +517,22 @@ class TransformerDecoder(nn.Module):
         num_fcs (int): Same as `TransformerDecoderLayer`. Default 2.
     """
 
-    def __init__(self,
-                 num_layers,
-                 embed_dims,
-                 num_heads,
-                 feedforward_channels,
-                 dropout=0.0,
-                 order=('selfattn', 'norm', 'multiheadattn', 'norm', 'ffn',
-                        'norm'),
-                 act_cfg=dict(type='ReLU', inplace=True),
-                 norm_cfg=dict(type='LN'),
-                 num_fcs=2,
-                 return_intermediate=False):
+    def __init__(
+        self,
+        num_layers,
+        embed_dims,
+        num_heads,
+        feedforward_channels,
+        dropout=0.0,
+        order=("selfattn", "norm", "multiheadattn", "norm", "ffn", "norm"),
+        act_cfg=dict(type="ReLU", inplace=True),
+        norm_cfg=dict(type="LN"),
+        num_fcs=2,
+        return_intermediate=False,
+    ):
         super(TransformerDecoder, self).__init__()
         assert isinstance(order, tuple) and len(order) == 6
-        assert set(order) == set(['selfattn', 'norm', 'multiheadattn', 'ffn'])
+        assert set(order) == set(["selfattn", "norm", "multiheadattn", "ffn"])
         self.num_layers = num_layers
         self.embed_dims = embed_dims
         self.num_heads = num_heads
@@ -530,20 +546,30 @@ class TransformerDecoder(nn.Module):
         self.layers = nn.ModuleList()
         for _ in range(num_layers):
             self.layers.append(
-                TransformerDecoderLayer(embed_dims, num_heads,
-                                        feedforward_channels, dropout, order,
-                                        act_cfg, norm_cfg, num_fcs))
+                TransformerDecoderLayer(
+                    embed_dims,
+                    num_heads,
+                    feedforward_channels,
+                    dropout,
+                    order,
+                    act_cfg,
+                    norm_cfg,
+                    num_fcs,
+                )
+            )
         self.norm = build_norm_layer(norm_cfg, embed_dims)[1]
 
-    def forward(self,
-                x,
-                memory,
-                memory_pos=None,
-                query_pos=None,
-                memory_attn_mask=None,
-                target_attn_mask=None,
-                memory_key_padding_mask=None,
-                target_key_padding_mask=None):
+    def forward(
+        self,
+        x,
+        memory,
+        memory_pos=None,
+        query_pos=None,
+        memory_attn_mask=None,
+        target_attn_mask=None,
+        memory_key_padding_mask=None,
+        target_key_padding_mask=None,
+    ):
         """Forward function for `TransformerDecoder`.
 
         Args:
@@ -567,9 +593,16 @@ class TransformerDecoder(nn.Module):
         """
         intermediate = []
         for layer in self.layers:
-            x = layer(x, memory, memory_pos, query_pos, memory_attn_mask,
-                      target_attn_mask, memory_key_padding_mask,
-                      target_key_padding_mask)
+            x = layer(
+                x,
+                memory,
+                memory_pos,
+                query_pos,
+                memory_attn_mask,
+                target_attn_mask,
+                memory_key_padding_mask,
+                target_key_padding_mask,
+            )
             if self.return_intermediate:
                 intermediate.append(self.norm(x))
         if self.norm is not None:
@@ -584,16 +617,16 @@ class TransformerDecoder(nn.Module):
     def __repr__(self):
         """str: a string that describes the module"""
         repr_str = self.__class__.__name__
-        repr_str += f'(num_layers={self.num_layers}, '
-        repr_str += f'embed_dims={self.embed_dims}, '
-        repr_str += f'num_heads={self.num_heads}, '
-        repr_str += f'feedforward_channels={self.feedforward_channels}, '
-        repr_str += f'dropout={self.dropout}, '
-        repr_str += f'order={self.order}, '
-        repr_str += f'act_cfg={self.act_cfg}, '
-        repr_str += f'norm_cfg={self.norm_cfg}, '
-        repr_str += f'num_fcs={self.num_fcs}, '
-        repr_str += f'return_intermediate={self.return_intermediate})'
+        repr_str += f"(num_layers={self.num_layers}, "
+        repr_str += f"embed_dims={self.embed_dims}, "
+        repr_str += f"num_heads={self.num_heads}, "
+        repr_str += f"feedforward_channels={self.feedforward_channels}, "
+        repr_str += f"dropout={self.dropout}, "
+        repr_str += f"order={self.order}, "
+        repr_str += f"act_cfg={self.act_cfg}, "
+        repr_str += f"norm_cfg={self.norm_cfg}, "
+        repr_str += f"num_fcs={self.num_fcs}, "
+        repr_str += f"return_intermediate={self.return_intermediate})"
         return repr_str
 
 
@@ -636,18 +669,20 @@ class Transformer(nn.Module):
             embed_dims].
     """
 
-    def __init__(self,
-                 embed_dims=512,
-                 num_heads=8,
-                 num_encoder_layers=6,
-                 num_decoder_layers=6,
-                 feedforward_channels=2048,
-                 dropout=0.0,
-                 act_cfg=dict(type='ReLU', inplace=True),
-                 norm_cfg=dict(type='LN'),
-                 num_fcs=2,
-                 pre_norm=False,
-                 return_intermediate_dec=False):
+    def __init__(
+        self,
+        embed_dims=512,
+        num_heads=8,
+        num_encoder_layers=6,
+        num_decoder_layers=6,
+        feedforward_channels=2048,
+        dropout=0.0,
+        act_cfg=dict(type="ReLU", inplace=True),
+        norm_cfg=dict(type="LN"),
+        num_fcs=2,
+        pre_norm=False,
+        return_intermediate_dec=False,
+    ):
         super(Transformer, self).__init__()
         self.embed_dims = embed_dims
         self.num_heads = num_heads
@@ -661,28 +696,40 @@ class Transformer(nn.Module):
         self.pre_norm = pre_norm
         self.return_intermediate_dec = return_intermediate_dec
         if self.pre_norm:
-            encoder_order = ('norm', 'selfattn', 'norm', 'ffn')
-            decoder_order = ('norm', 'selfattn', 'norm', 'multiheadattn',
-                             'norm', 'ffn')
+            encoder_order = ("norm", "selfattn", "norm", "ffn")
+            decoder_order = ("norm", "selfattn", "norm", "multiheadattn", "norm", "ffn")
         else:
-            encoder_order = ('selfattn', 'norm', 'ffn', 'norm')
-            decoder_order = ('selfattn', 'norm', 'multiheadattn', 'norm',
-                             'ffn', 'norm')
-        self.encoder = TransformerEncoder(num_encoder_layers, embed_dims,
-                                          num_heads, feedforward_channels,
-                                          dropout, encoder_order, act_cfg,
-                                          norm_cfg, num_fcs)
-        self.decoder = TransformerDecoder(num_decoder_layers, embed_dims,
-                                          num_heads, feedforward_channels,
-                                          dropout, decoder_order, act_cfg,
-                                          norm_cfg, num_fcs,
-                                          return_intermediate_dec)
+            encoder_order = ("selfattn", "norm", "ffn", "norm")
+            decoder_order = ("selfattn", "norm", "multiheadattn", "norm", "ffn", "norm")
+        self.encoder = TransformerEncoder(
+            num_encoder_layers,
+            embed_dims,
+            num_heads,
+            feedforward_channels,
+            dropout,
+            encoder_order,
+            act_cfg,
+            norm_cfg,
+            num_fcs,
+        )
+        self.decoder = TransformerDecoder(
+            num_decoder_layers,
+            embed_dims,
+            num_heads,
+            feedforward_channels,
+            dropout,
+            decoder_order,
+            act_cfg,
+            norm_cfg,
+            num_fcs,
+            return_intermediate_dec,
+        )
 
-    def init_weights(self, distribution='uniform'):
+    def init_weights(self, distribution="uniform"):
         """Initialize the transformer weights."""
         # follow the official DETR to init parameters
         for m in self.modules():
-            if hasattr(m, 'weight') and m.weight.dim() > 1:
+            if hasattr(m, "weight") and m.weight.dim() > 1:
                 xavier_init(m, distribution=distribution)
 
     def forward(self, x, mask, query_embed, pos_embed):
@@ -712,10 +759,10 @@ class Transformer(nn.Module):
         x = x.flatten(2).permute(2, 0, 1)  # [bs, c, h, w] -> [h*w, bs, c]
         pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
         query_embed = query_embed.unsqueeze(1).repeat(
-            1, bs, 1)  # [num_query, dim] -> [num_query, bs, dim]
+            1, bs, 1
+        )  # [num_query, dim] -> [num_query, bs, dim]
         mask = mask.flatten(1)  # [bs, h, w] -> [bs, h*w]
-        memory = self.encoder(
-            x, pos=pos_embed, attn_mask=None, key_padding_mask=mask)
+        memory = self.encoder(x, pos=pos_embed, attn_mask=None, key_padding_mask=mask)
         target = torch.zeros_like(query_embed)
         # out_dec: [num_layers, num_query, bs, dim]
         out_dec = self.decoder(
@@ -726,7 +773,8 @@ class Transformer(nn.Module):
             memory_attn_mask=None,
             target_attn_mask=None,
             memory_key_padding_mask=mask,
-            target_key_padding_mask=None)
+            target_key_padding_mask=None,
+        )
         out_dec = out_dec.transpose(1, 2)
         memory = memory.permute(1, 2, 0).reshape(bs, c, h, w)
         return out_dec, memory
@@ -734,17 +782,17 @@ class Transformer(nn.Module):
     def __repr__(self):
         """str: a string that describes the module"""
         repr_str = self.__class__.__name__
-        repr_str += f'(embed_dims={self.embed_dims}, '
-        repr_str += f'num_heads={self.num_heads}, '
-        repr_str += f'num_encoder_layers={self.num_encoder_layers}, '
-        repr_str += f'num_decoder_layers={self.num_decoder_layers}, '
-        repr_str += f'feedforward_channels={self.feedforward_channels}, '
-        repr_str += f'dropout={self.dropout}, '
-        repr_str += f'act_cfg={self.act_cfg}, '
-        repr_str += f'norm_cfg={self.norm_cfg}, '
-        repr_str += f'num_fcs={self.num_fcs}, '
-        repr_str += f'pre_norm={self.pre_norm}, '
-        repr_str += f'return_intermediate_dec={self.return_intermediate_dec})'
+        repr_str += f"(embed_dims={self.embed_dims}, "
+        repr_str += f"num_heads={self.num_heads}, "
+        repr_str += f"num_encoder_layers={self.num_encoder_layers}, "
+        repr_str += f"num_decoder_layers={self.num_decoder_layers}, "
+        repr_str += f"feedforward_channels={self.feedforward_channels}, "
+        repr_str += f"dropout={self.dropout}, "
+        repr_str += f"act_cfg={self.act_cfg}, "
+        repr_str += f"norm_cfg={self.norm_cfg}, "
+        repr_str += f"num_fcs={self.num_fcs}, "
+        repr_str += f"pre_norm={self.pre_norm}, "
+        repr_str += f"return_intermediate_dec={self.return_intermediate_dec})"
         return repr_str
 
 
@@ -772,13 +820,15 @@ class DynamicConv(nn.Module):
             layer normalization.
     """
 
-    def __init__(self,
-                 in_channels=256,
-                 feat_channels=64,
-                 out_channels=None,
-                 input_feat_shape=7,
-                 act_cfg=dict(type='ReLU', inplace=True),
-                 norm_cfg=dict(type='LN')):
+    def __init__(
+        self,
+        in_channels=256,
+        feat_channels=64,
+        out_channels=None,
+        input_feat_shape=7,
+        act_cfg=dict(type="ReLU", inplace=True),
+        norm_cfg=dict(type="LN"),
+    ):
         super(DynamicConv, self).__init__()
         self.in_channels = in_channels
         self.feat_channels = feat_channels
@@ -790,8 +840,7 @@ class DynamicConv(nn.Module):
 
         self.num_params_in = self.in_channels * self.feat_channels
         self.num_params_out = self.out_channels * self.feat_channels
-        self.dynamic_layer = nn.Linear(
-            self.in_channels, self.num_params_in + self.num_params_out)
+        self.dynamic_layer = nn.Linear(self.in_channels, self.num_params_in + self.num_params_out)
 
         self.norm_in = build_norm_layer(norm_cfg, self.feat_channels)[1]
         self.norm_out = build_norm_layer(norm_cfg, self.out_channels)[1]
@@ -818,16 +867,17 @@ class DynamicConv(nn.Module):
             (num_all_proposals, out_channels).
         """
         num_proposals = param_feature.size(0)
-        input_feature = input_feature.view(num_proposals, self.in_channels,
-                                           -1).permute(2, 0, 1)
+        input_feature = input_feature.view(num_proposals, self.in_channels, -1).permute(2, 0, 1)
 
         input_feature = input_feature.permute(1, 0, 2)
         parameters = self.dynamic_layer(param_feature)
 
-        param_in = parameters[:, :self.num_params_in].view(
-            -1, self.in_channels, self.feat_channels)
-        param_out = parameters[:, -self.num_params_out:].view(
-            -1, self.feat_channels, self.out_channels)
+        param_in = parameters[:, : self.num_params_in].view(
+            -1, self.in_channels, self.feat_channels
+        )
+        param_out = parameters[:, -self.num_params_out :].view(
+            -1, self.feat_channels, self.out_channels
+        )
 
         # input_feature has shape (num_all_proposals, H*W, in_channels)
         # param_in has shape (num_all_proposals, in_channels, feat_channels)
@@ -851,10 +901,10 @@ class DynamicConv(nn.Module):
     def __repr__(self):
         """str: a string that describes the module"""
         repr_str = self.__class__.__name__
-        repr_str += f'(in_channels={self.in_channels}, '
-        repr_str += f'feat_channels={self.feat_channels}, '
-        repr_str += f'out_channels={self.out_channels_raw}, '
-        repr_str += f'input_feat_shape={self.input_feat_shape}, '
-        repr_str += f'act_cfg={self.act_cfg}, '
-        repr_str += f'norm_cfg={self.norm_cfg})'
+        repr_str += f"(in_channels={self.in_channels}, "
+        repr_str += f"feat_channels={self.feat_channels}, "
+        repr_str += f"out_channels={self.out_channels_raw}, "
+        repr_str += f"input_feat_shape={self.input_feat_shape}, "
+        repr_str += f"act_cfg={self.act_cfg}, "
+        repr_str += f"norm_cfg={self.norm_cfg})"
         return repr_str

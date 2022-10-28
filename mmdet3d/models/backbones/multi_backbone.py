@@ -23,15 +23,17 @@ class MultiBackbone(nn.Module):
             for each backbone.
     """
 
-    def __init__(self,
-                 num_streams,
-                 backbones,
-                 aggregation_mlp_channels=None,
-                 conv_cfg=dict(type='Conv1d'),
-                 norm_cfg=dict(type='BN1d', eps=1e-5, momentum=0.01),
-                 act_cfg=dict(type='ReLU'),
-                 suffixes=('net0', 'net1'),
-                 **kwargs):
+    def __init__(
+        self,
+        num_streams,
+        backbones,
+        aggregation_mlp_channels=None,
+        conv_cfg=dict(type="Conv1d"),
+        norm_cfg=dict(type="BN1d", eps=1e-5, momentum=0.01),
+        act_cfg=dict(type="ReLU"),
+        suffixes=("net0", "net1"),
+        **kwargs,
+    ):
         super().__init__()
         assert isinstance(backbones, dict) or isinstance(backbones, list)
         if isinstance(backbones, dict):
@@ -50,14 +52,15 @@ class MultiBackbone(nn.Module):
         out_channels = 0
 
         for backbone_cfg in backbones:
-            out_channels += backbone_cfg['fp_channels'][-1][-1]
+            out_channels += backbone_cfg["fp_channels"][-1][-1]
             self.backbone_list.append(build_backbone(backbone_cfg))
 
         # Feature aggregation layers
         if aggregation_mlp_channels is None:
             aggregation_mlp_channels = [
-                out_channels, out_channels // 2,
-                out_channels // len(self.backbone_list)
+                out_channels,
+                out_channels // 2,
+                out_channels // len(self.backbone_list),
             ]
         else:
             aggregation_mlp_channels.insert(0, out_channels)
@@ -65,7 +68,7 @@ class MultiBackbone(nn.Module):
         self.aggregation_layers = nn.Sequential()
         for i in range(len(aggregation_mlp_channels) - 1):
             self.aggregation_layers.add_module(
-                f'layer{i}',
+                f"layer{i}",
                 ConvModule(
                     aggregation_mlp_channels[i],
                     aggregation_mlp_channels[i + 1],
@@ -75,7 +78,9 @@ class MultiBackbone(nn.Module):
                     norm_cfg=norm_cfg,
                     act_cfg=act_cfg,
                     bias=True,
-                    inplace=True))
+                    inplace=True,
+                ),
+            )
 
     def init_weights(self, pretrained=None):
         """Initialize the weights of PointNet++ backbone."""
@@ -83,6 +88,7 @@ class MultiBackbone(nn.Module):
         # to follow the original implementation
         if isinstance(pretrained, str):
             from mmdet3d.utils import get_root_logger
+
             logger = get_root_logger()
             load_checkpoint(self, pretrained, strict=False, logger=logger)
 
@@ -111,14 +117,14 @@ class MultiBackbone(nn.Module):
         for ind in range(len(self.backbone_list)):
             cur_ret = self.backbone_list[ind](points)
             cur_suffix = self.suffixes[ind]
-            fp_features.append(cur_ret['fp_features'][-1])
-            if cur_suffix != '':
+            fp_features.append(cur_ret["fp_features"][-1])
+            if cur_suffix != "":
                 for k in cur_ret.keys():
-                    cur_ret[k + '_' + cur_suffix] = cur_ret.pop(k)
+                    cur_ret[k + "_" + cur_suffix] = cur_ret.pop(k)
             ret.update(cur_ret)
 
         # Combine the features here
         hd_feature = torch.cat(fp_features, dim=1)
         hd_feature = self.aggregation_layers(hd_feature)
-        ret['hd_feature'] = hd_feature
+        ret["hd_feature"] = hd_feature
         return ret

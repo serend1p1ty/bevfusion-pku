@@ -20,14 +20,13 @@ def convert_SyncBN(config):
     """
     if isinstance(config, dict):
         for item in config:
-            if item == 'norm_cfg':
-                config[item]['type'] = config[item]['type']. \
-                                    replace('naiveSyncBN', 'BN')
+            if item == "norm_cfg":
+                config[item]["type"] = config[item]["type"].replace("naiveSyncBN", "BN")
             else:
                 convert_SyncBN(config[item])
 
 
-def init_detector(config, checkpoint=None, device='cuda:0'):
+def init_detector(config, checkpoint=None, device="cuda:0"):
     """Initialize a detector from config file.
 
     Args:
@@ -43,16 +42,15 @@ def init_detector(config, checkpoint=None, device='cuda:0'):
     if isinstance(config, str):
         config = mmcv.Config.fromfile(config)
     elif not isinstance(config, mmcv.Config):
-        raise TypeError('config must be a filename or Config object, '
-                        f'but got {type(config)}')
+        raise TypeError("config must be a filename or Config object, " f"but got {type(config)}")
     config.model.pretrained = None
     convert_SyncBN(config.model)
     config.model.train_cfg = None
-    model = build_detector(config.model, test_cfg=config.get('test_cfg'))
+    model = build_detector(config.model, test_cfg=config.get("test_cfg"))
     if checkpoint is not None:
         checkpoint = load_checkpoint(model, checkpoint)
-        if 'CLASSES' in checkpoint['meta']:
-            model.CLASSES = checkpoint['meta']['CLASSES']
+        if "CLASSES" in checkpoint["meta"]:
+            model.CLASSES = checkpoint["meta"]["CLASSES"]
         else:
             model.CLASSES = config.class_names
     model.cfg = config  # save the config in the model for convenience
@@ -90,7 +88,8 @@ def inference_detector(model, pcd):
         pts_seg_fields=[],
         bbox_fields=[],
         mask_fields=[],
-        seg_fields=[])
+        seg_fields=[],
+    )
     data = test_pipeline(data)
     data = collate([data], samples_per_gpu=1)
     if next(model.parameters()).is_cuda:
@@ -98,8 +97,8 @@ def inference_detector(model, pcd):
         data = scatter(data, [device.index])[0]
     else:
         # this is a workaround to avoid the bug of MMDataParallel
-        data['img_metas'] = data['img_metas'][0].data
-        data['points'] = data['points'][0].data
+        data["img_metas"] = data["img_metas"][0].data
+        data["points"] = data["points"][0].data
     # forward the model
     with torch.no_grad():
         result = model(return_loss=False, rescale=True, **data)
@@ -114,22 +113,22 @@ def show_result_meshlab(data, result, out_dir):
         result (dict): Predicted result from model.
         out_dir (str): Directory to save visualized result.
     """
-    points = data['points'][0][0].cpu().numpy()
-    pts_filename = data['img_metas'][0][0]['pts_filename']
-    file_name = osp.split(pts_filename)[-1].split('.')[0]
+    points = data["points"][0][0].cpu().numpy()
+    pts_filename = data["img_metas"][0][0]["pts_filename"]
+    file_name = osp.split(pts_filename)[-1].split(".")[0]
 
-    assert out_dir is not None, 'Expect out_dir, got none.'
+    assert out_dir is not None, "Expect out_dir, got none."
 
-    if 'pts_bbox' in result[0].keys():
-        pred_bboxes = result[0]['pts_bbox']['boxes_3d'].tensor.numpy()
+    if "pts_bbox" in result[0].keys():
+        pred_bboxes = result[0]["pts_bbox"]["boxes_3d"].tensor.numpy()
     else:
-        pred_bboxes = result[0]['boxes_3d'].tensor.numpy()
+        pred_bboxes = result[0]["boxes_3d"].tensor.numpy()
     # for now we convert points into depth mode
-    if data['img_metas'][0][0]['box_mode_3d'] != Box3DMode.DEPTH:
+    if data["img_metas"][0][0]["box_mode_3d"] != Box3DMode.DEPTH:
         points = points[..., [1, 0, 2]]
         points[..., 0] *= -1
-        pred_bboxes = Box3DMode.convert(pred_bboxes,
-                                        data['img_metas'][0][0]['box_mode_3d'],
-                                        Box3DMode.DEPTH)
+        pred_bboxes = Box3DMode.convert(
+            pred_bboxes, data["img_metas"][0][0]["box_mode_3d"], Box3DMode.DEPTH
+        )
     show_result(points, None, pred_bboxes, out_dir, file_name, show=False)
     return out_dir, file_name
