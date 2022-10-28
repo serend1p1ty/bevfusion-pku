@@ -96,7 +96,7 @@ def main():
     cfg = Config.fromfile(args.config)
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
-    
+
     autodrive_hyper_params = os.environ.get("HYPER_PARAMS")
     if autodrive_hyper_params is not None:
         autodrive_hyper_params = json.loads(autodrive_hyper_params)
@@ -137,6 +137,8 @@ def main():
     else:
         distributed = True
         init_dist(args.launcher, **cfg.dist_params)
+        if cfg.get("model_parallelism", False):
+            torch.cuda.set_device(args.local_rank * 2)
         # re-set gpu_ids with distributed training mode
         _, world_size = get_dist_info()
         cfg.gpu_ids = range(world_size)
@@ -256,7 +258,7 @@ def main():
             CLASSES=datasets[0].CLASSES)
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
-    
+
     if 'load_img_from' in cfg:
         print(cfg.load_img_from)
         checkpoint= torch.load(cfg.load_img_from, map_location='cpu')
@@ -281,7 +283,7 @@ def main():
                 continue
             new_ckpt[new_k] = new_v
         model.load_state_dict(new_ckpt, strict=False)
-    
+
     if 'load_lift_from' in cfg:
         print(cfg.load_lift_from)
         checkpoint= torch.load(cfg.load_lift_from, map_location='cpu')

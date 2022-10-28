@@ -1,6 +1,8 @@
+import os
 import mmcv
 import torch
 from mmcv.parallel import DataContainer as DC
+from mmcv.parallel.scatter_gather import scatter_kwargs
 from mmcv.runner import force_fp32
 from os import path as osp
 from torch import nn as nn
@@ -64,8 +66,7 @@ class TransFusionDetector(MVXTwoStageDetector):
         if not self.with_pts_bbox:
             return None
         voxels, num_points, coors = self.voxelize(pts)
-        voxel_features = self.pts_voxel_encoder(voxels, num_points, coors,
-                                                )
+        voxel_features = self.pts_voxel_encoder(voxels, num_points, coors)
         batch_size = coors[-1, 0] + 1
         x = self.pts_middle_encoder(voxel_features, coors, batch_size)
         x = self.pts_backbone(x)
@@ -100,16 +101,35 @@ class TransFusionDetector(MVXTwoStageDetector):
         coors_batch = torch.cat(coors_batch, dim=0)
         return voxels, num_points, coors_batch
 
-    def forward_train(self,
-                      points=None,
-                      img_metas=None,
-                      gt_bboxes_3d=None,
-                      gt_labels_3d=None,
-                      gt_labels=None,
-                      gt_bboxes=None,
-                      img=None,
-                      proposals=None,
-                      gt_bboxes_ignore=None):
+    def to_multi_cuda_devices(self):
+        device1 = int(os.environ['DEVICE_ID1'])
+        device2 = int(os.environ['DEVICE_ID2'])
+        for name, module in self.named_modules():
+            if "pts_middle_encoder" in name or "pts_backbone" in name or "pts_neck" in name:
+                module.cuda(device1)
+            else:
+                module.cuda(device2)
+        return self
+
+    def forward_train(self, *args, **kwargs):
+        if "MODEL_PARALLELISM" in os.environ:
+            device1 = int(os.environ['DEVICE_ID1'])
+            # unpack mmcv DataContainer
+            args, kwargs = scatter_kwargs(args, kwargs, [device1], dim=0)
+            return self._forward_train(*args[0], **kwargs[0])
+        else:
+            return self._forward_train(*args, **kwargs)
+
+    def _forward_train(self,
+                       points=None,
+                       img_metas=None,
+                       gt_bboxes_3d=None,
+                       gt_labels_3d=None,
+                       gt_labels=None,
+                       gt_bboxes=None,
+                       img=None,
+                       proposals=None,
+                       gt_bboxes_ignore=None):
         """Forward training function.
 
         Args:
@@ -139,6 +159,15 @@ class TransFusionDetector(MVXTwoStageDetector):
             points, img=img, img_metas=img_metas)
         losses = dict()
         if pts_feats:
+            if "MODEL_PARALLELISM" in os.environ:
+                def to_device2(datas):
+                    device2 = int(os.environ['DEVICE_ID2'])
+                    if datas:
+                        for i, _ in enumerate(datas):
+                            datas[i] = datas[i].cuda(device2)
+                to_device2(pts_feats)
+                to_device2(img_feats)
+                to_device2(gt_labels_3d)
             losses_pts = self.forward_pts_train(pts_feats, img_feats, gt_bboxes_3d,
                                                 gt_labels_3d, img_metas,
                                                 gt_bboxes_ignore)

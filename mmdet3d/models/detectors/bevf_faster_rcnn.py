@@ -1,5 +1,7 @@
+import os
 import torch
 from mmcv.runner import force_fp32
+from mmcv.parallel.scatter_gather import scatter_kwargs
 from torch.nn import functional as F
 from torch.distributions import Normal
 import numpy as np
@@ -51,7 +53,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
         self.lift = camera_stream
         self.se = se
         if camera_stream:
-            self.lift_splat_shot_vis = LiftSplatShoot(lss=lss, grid=grid, inputC=imc, camC=64, 
+            self.lift_splat_shot_vis = LiftSplatShoot(lss=lss, grid=grid, inputC=imc, camC=64,
             pc_range=pc_range, final_dim=final_dim, downsample=downsample)
         if lc_fusion:
             if se:
@@ -65,7 +67,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                 norm_cfg=dict(type='BN', eps=1e-3, momentum=0.01),
                 act_cfg=dict(type='ReLU'),
                 inplace=False)
-            
+
         self.freeze_img = kwargs.get('freeze_img', False)
         self.init_weights(pretrained=kwargs.get('pretrained', None))
         self.freeze()
@@ -88,19 +90,29 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
         if not self.with_pts_backbone:
             return None
         voxels, num_points, coors = self.voxelize(pts)
-        voxel_features = self.pts_voxel_encoder(voxels, num_points, coors,
-                                                )
+        voxel_features = self.pts_voxel_encoder(voxels, num_points, coors)
         batch_size = coors[-1, 0] + 1
         x = self.pts_middle_encoder(voxel_features, coors, batch_size)
         x = self.pts_backbone(x)
         if self.with_pts_neck:
             x = self.pts_neck(x)
         return x
-    
+
     def extract_feat(self, points, img, img_metas, gt_bboxes_3d=None):
         """Extract features from images and points."""
+        if "MODEL_PARALLELISM" in os.environ:
+            device1 = int(os.environ['DEVICE_ID1'])
+            img = img.cuda(device1)
+            for i, _ in enumerate(points):
+                points[i] = points[i].cuda(device1)
         img_feats = self.extract_img_feat(img, img_metas)
         pts_feats = self.extract_pts_feat(points, img_feats, img_metas)
+        if "MODEL_PARALLELISM" in os.environ:
+            device2 = int(os.environ['DEVICE_ID2'])
+            for i, _ in enumerate(img_feats):
+                img_feats[i] = img_feats[i].cuda(device2)
+            for i, _ in enumerate(pts_feats):
+                pts_feats[i] = pts_feats[i].cuda(device2)
 
         if self.lift:
             BN, C, H, W = img_feats[0].shape
@@ -122,7 +134,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
             rots = torch.stack(rots)
             trans = torch.stack(trans)
             lidar2img_rt = img_metas[sample_idx]['lidar2img']  #### extrinsic parameters for multi-view images
-            
+
             img_bev_feat, depth_dist = self.lift_splat_shot_vis(img_feats_view, rots, trans, lidar2img_rt=lidar2img_rt, img_metas=img_metas)
             # print(img_bev_feat.shape, pts_feats[-1].shape)
             if pts_feats is None:
@@ -140,13 +152,13 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
             depth_dist = depth_dist
         )
         # return (img_feats, pts_feats, depth_dist)
-    
+
     def simple_test(self, points, img_metas, img=None, rescale=False):
         """Test function without augmentaiton."""
         feature_dict = self.extract_feat(
             points, img=img, img_metas=img_metas)
         img_feats = feature_dict['img_feats']
-        pts_feats = feature_dict['pts_feats'] 
+        pts_feats = feature_dict['pts_feats']
         depth_dist = feature_dict['depth_dist']
 
         bbox_list = [dict() for i in range(len(img_metas))]
@@ -163,21 +175,45 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                 result_dict['img_bbox'] = img_bbox
         return bbox_list
 
-    def forward_train(self,
-                      points=None,
-                      img_metas=None,
-                      gt_bboxes_3d=None,
-                      gt_labels_3d=None,
-                      gt_labels=None,
-                      gt_bboxes=None,
-                      img=None,
-                      img_depth=None,
-                      proposals=None,
-                      gt_bboxes_ignore=None):
+    def to_multi_cuda_devices(self):
+        device1 = int(os.environ['DEVICE_ID1'])
+        device2 = int(os.environ['DEVICE_ID2'])
+        for name, module in self.named_modules():
+            if ("img_backbone" in name
+                or "img_neck" in name
+                or "pts_voxel_encoder" in name
+                or "pts_middle_encoder" in name
+                or "pts_backbone" in name
+                or "pts_neck" in name):
+                module.cuda(device1)
+            else:
+                module.cuda(device2)
+        return self
+
+    def forward_train(self, *args, **kwargs):
+        if "MODEL_PARALLELISM" in os.environ:
+            device2 = int(os.environ['DEVICE_ID2'])
+            # unpack mmcv DataContainer
+            args, kwargs = scatter_kwargs(args, kwargs, [device2], dim=0)
+            return self._forward_train(*args[0], **kwargs[0])
+        else:
+            return self._forward_train(*args, **kwargs)
+
+    def _forward_train(self,
+                       points=None,
+                       img_metas=None,
+                       gt_bboxes_3d=None,
+                       gt_labels_3d=None,
+                       gt_labels=None,
+                       gt_bboxes=None,
+                       img=None,
+                       img_depth=None,
+                       proposals=None,
+                       gt_bboxes_ignore=None):
         feature_dict = self.extract_feat(
             points, img=img, img_metas=img_metas, gt_bboxes_3d=gt_bboxes_3d)
         img_feats = feature_dict['img_feats']
-        pts_feats = feature_dict['pts_feats'] 
+        pts_feats = feature_dict['pts_feats']
         depth_dist = feature_dict['depth_dist']
 
         losses = dict()
@@ -199,7 +235,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                 losses.update(img_depth_loss=loss_depth)
             losses.update(losses_img)
         return losses
-    
+
     def depth_dist_loss(self, predict_depth_dist, gt_depth, loss_method='kld', img=None):
         # predict_depth_dist: B, N, D, H, W
         # gt_depth: B, N, H', W'

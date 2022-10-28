@@ -1,6 +1,8 @@
+import os
 import mmcv
 import torch
 from mmcv.parallel import DataContainer as DC
+from mmcv.parallel.scatter_gather import scatter_kwargs
 from mmcv.runner import force_fp32
 from os import path as osp
 from torch import nn as nn
@@ -63,8 +65,7 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
         if not self.with_pts_backbone:
             return None
         voxels, num_points, coors = self.voxelize(pts)
-        voxel_features = self.pts_voxel_encoder(voxels, num_points, coors,
-                                                )
+        voxel_features = self.pts_voxel_encoder(voxels, num_points, coors)
         batch_size = coors[-1, 0] + 1
         x = self.pts_middle_encoder(voxel_features, coors, batch_size)
         x = self.pts_backbone(x)
@@ -99,17 +100,34 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
         coors_batch = torch.cat(coors_batch, dim=0)
         return voxels, num_points, coors_batch
 
-    def forward_train(self,
-                      points=None,
-                      img_metas=None,
-                      gt_bboxes_3d=None,
-                      gt_labels_3d=None,
-                      gt_labels=None,
-                      gt_bboxes=None,
-                      img=None,
-                      img_depth=None,
-                      proposals=None,
-                      gt_bboxes_ignore=None):
+    def to_multi_cuda_devices(self):
+        device1 = int(os.environ['DEVICE_ID1'])
+        device2 = int(os.environ['DEVICE_ID2'])
+        for name, module in self.named_modules():
+            if "img_backbone" in name or "img_neck" in name:
+                module.cuda(device1)
+            else:
+                module.cuda(device2)
+        return self
+
+    def forward_train(self, *args, **kwargs):
+        if "MODEL_PARALLELISM" in os.environ:
+            device1 = int(os.environ['DEVICE_ID1'])
+            # unpack mmcv DataContainer
+            args, kwargs = scatter_kwargs(args, kwargs, [device1], dim=0)
+        return self._forward_train(*args[0], **kwargs[0])
+
+    def _forward_train(self,
+                       points=None,
+                       img_metas=None,
+                       gt_bboxes_3d=None,
+                       gt_labels_3d=None,
+                       gt_labels=None,
+                       gt_bboxes=None,
+                       img=None,
+                       img_depth=None,
+                       proposals=None,
+                       gt_bboxes_ignore=None):
         """Forward training function.
 
         Args:
@@ -138,10 +156,20 @@ class BEVF_TransFusion(BEVF_FasterRCNN):
         feature_dict = self.extract_feat(
             points, img=img, img_metas=img_metas)
         img_feats = feature_dict['img_feats']
-        pts_feats = feature_dict['pts_feats'] 
+        pts_feats = feature_dict['pts_feats']
         depth_dist = feature_dict['depth_dist']
         losses = dict()
         if pts_feats:
+            if "MODEL_PARALLELISM" in os.environ:
+                device2 = int(os.environ['DEVICE_ID2'])
+                if pts_feats:
+                    for i, _ in enumerate(pts_feats):
+                        pts_feats[i] = pts_feats[i].cuda(device2)
+                if img_feats:
+                    for i, _ in enumerate(img_feats):
+                        img_feats[i] = img_feats[i].cuda(device2)
+                for i, _ in enumerate(gt_labels_3d):
+                    gt_labels_3d[i] = gt_labels_3d[i].cuda(device2)
             losses_pts = self.forward_pts_train(pts_feats, img_feats, gt_bboxes_3d,
                                                 gt_labels_3d, img_metas,
                                                 gt_bboxes_ignore)
