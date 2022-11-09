@@ -15,6 +15,17 @@ from torchvision.utils import save_image
 from mmdet3d.models.fusion_layers import apply_3d_transformation
 import torch.nn.functional as F
 
+norm_offsets = {
+    "2": [-29.47, 32.36, 45.5],
+    "3": [-14.57, 73.2, 45.24],
+    "12": [181.5, -80.63, 45.93],
+    "21": [13.57, 73.88, 45.45],
+    "32": [56.18, 5.57, 45.58],
+    "33": [-57.96, -7.58, 45.62],
+    "34": [-6.65, -23.98, 45.46],
+    "35": [63.9, 51.86, 45.73],
+}
+
 
 class Up(nn.Module):
     def __init__(self, in_channels, out_channels, scale_factor=2):
@@ -167,7 +178,6 @@ class LiftSplatShoot(nn.Module):
             pc_range: point cloud range.
             inputC: input camera feature channel dimension (default 256).
             grid: stride for splat, see https://github.com/nv-tlabs/lift-splat-shoot.
-
         """
         super(LiftSplatShoot, self).__init__()
         self.pc_range = pc_range
@@ -185,24 +195,34 @@ class LiftSplatShoot(nn.Module):
             self.grid_conf["ybound"],
             self.grid_conf["zbound"],
         )
+        # [0.5000, 0.5000, 0.5000]
         self.dx = nn.Parameter(dx, requires_grad=False)
+        # [-49.7500, -49.7500,  -4.7500]
         self.bx = nn.Parameter(bx, requires_grad=False)
+        # [200, 200,  16]
         self.nx = nn.Parameter(nx, requires_grad=False)
 
+        # 8
         self.downsample = downsample
+        # fH: 112, fW: 200
         self.fH, self.fW = (
             self.final_dim[0] // self.downsample,
             self.final_dim[1] // self.downsample,
         )
+        # 每个深度的特征维度: 64
         self.camC = camC
+        # 输入图片特征的维度: 256
         self.inputC = inputC
+        # [41, 112, 200, 3]
         self.frustum = self.create_frustum()
+        # 预设的深度采样个数: 41
         self.D, _, _, _ = self.frustum.shape
         self.camencode = CamEncode(self.D, self.camC, self.inputC)
 
         # toggle using QuickCumsum vs. autograd
         self.use_quickcumsum = True
         z = self.grid_conf["zbound"]
+        # 将z轴reshape到x-y轴之后的通道数: 1024
         cz = int(self.camC * ((z[1] - z[0]) // z[2]))
         self.lss = lss
         self.bevencode = nn.Sequential(
@@ -243,7 +263,7 @@ class LiftSplatShoot(nn.Module):
         frustum = torch.stack((xs, ys, ds), -1)
         return nn.Parameter(frustum, requires_grad=False)
 
-    def get_geometry(self, rots, trans, post_rots=None, post_trans=None):
+    def get_geometry(self, rots, trans, post_rots=None, post_trans=None, nid=None):
         """Determine the (x,y,z) locations (in the ego frame)
         of the points in the point cloud.
         Returns B x N x D x H/downsample x W/downsample x 3
@@ -259,15 +279,24 @@ class LiftSplatShoot(nn.Module):
         points = rots.view(B, N, 1, 1, 1, 3, 3).matmul(points).squeeze(-1)
         points += trans.view(B, N, 1, 1, 1, 3)
 
+        assert isinstance(nid, str)
+        norm_offset = torch.Tensor(norm_offsets[nid]).to(points.device)
+        # After normalize, -3.1446 <= points_z <= 7.3388, is it normal?
+        points += norm_offset
+
         return points
 
     def get_cam_feats(self, x):
         """Return B x N x D x H/downsample x W/downsample x C"""
+        # [2, 6, 256, 112, 200]
         B, N, C, H, W = x.shape
 
         x = x.view(B * N, C, H, W)
+        # 根据图片特征预测深度分布，并将图片特征从256下采样到64，然后乘以深度
         x, depth = self.camencode(x)
+        # [2, 6, 64, 41, 112, 200]
         x = x.view(B, N, self.camC, self.D, H, W)
+        # [2, 6, 41, 112, 200, 64]
         x = x.permute(0, 1, 3, 4, 5, 2)
         depth = depth.view(B, N, self.D, H, W)
         return x, depth
@@ -297,6 +326,7 @@ class LiftSplatShoot(nn.Module):
             & (geom_feats[:, 2] >= 0)
             & (geom_feats[:, 2] < self.nx[2])
         )
+        assert kept.sum() != 0, "voxel_pooling failed, check img2lidar rotation & translation!"
         x = x[kept]
         geom_feats = geom_feats[kept]
         # get tensors from the same voxel next to each other
@@ -320,8 +350,8 @@ class LiftSplatShoot(nn.Module):
 
         return final
 
-    def get_voxels(self, x, rots=None, trans=None, post_rots=None, post_trans=None):
-        geom = self.get_geometry(rots, trans, post_rots, post_trans)
+    def get_voxels(self, x, rots=None, trans=None, post_rots=None, post_trans=None, nid=None):
+        geom = self.get_geometry(rots, trans, post_rots, post_trans, nid)
         x, depth = self.get_cam_feats(x)
         x = self.voxel_pooling(geom, x)
         return x, depth
@@ -343,8 +373,15 @@ class LiftSplatShoot(nn.Module):
         post_trans=None,
         aug_bboxs=None,
         img_metas=None,
+        sample_idx=None,
     ):
-        x, depth = self.get_voxels(x, rots, trans, post_rots, post_trans)  # [B, C, H, W, L]
+        assert isinstance(sample_idx, int)
+        nid = img_metas[sample_idx]["nid"]
+        # [2, 64, 16, 200, 200]
+        x, depth = self.get_voxels(x, rots, trans, post_rots, post_trans, nid)  # [B, C, H, W, L]
+        # [2, 1024, 200, 200]
         bev = self.s2c(x)
+        # 1024 -> camC (64) -> inputC (256)
+        # [2, 256, 200, 200]
         x = self.bevencode(bev)
         return x, depth

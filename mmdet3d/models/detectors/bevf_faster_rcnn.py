@@ -79,7 +79,9 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                 lss=lss,
                 grid=grid,
                 inputC=imc,
-                camC=64,
+                # 原本是64，设置为32减少显存占用
+                camC=32,
+                camera_depth_range=camera_depth_range,
                 pc_range=pc_range,
                 final_dim=final_dim,
                 downsample=downsample,
@@ -114,7 +116,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                 for param in self.lift_splat_shot_vis.parameters():
                     param.requires_grad = False
 
-    def extract_pts_feat(self, pts, img_feats, img_metas):
+    def extract_pts_feat(self, pts):
         """Extract features of points."""
         if not self.with_pts_backbone:
             return None
@@ -131,45 +133,56 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
         """Extract features from images and points."""
         if "MODEL_PARALLELISM" in os.environ:
             device1 = int(os.environ["DEVICE_ID1"])
-            img = img.cuda(device1)
+            # [2, 6, 3, 448, 800]
+            # img = img.cuda(device1)
+            for i, _ in enumerate(img):
+                img[i] = img[i].cuda(device1).unsqueeze(0)
+            # [[352164, 4], [366130, 4]]
             for i, _ in enumerate(points):
                 points[i] = points[i].cuda(device1)
-        img_feats = self.extract_img_feat(img, img_metas)
-        pts_feats = self.extract_pts_feat(points, img_feats, img_metas)
+        # [[12, 256, 112, 200]]
+        # img_feats = self.extract_img_feat(img, img_metas)
+        num_views_per_sample = []
+        img_feats_list = []
+        for i, img_i in enumerate(img):
+            num_views_per_sample.append(img_i.shape[1])
+            img_feats_list.extend(self.extract_img_feat(img_i, img_metas, i))
+        # [[2, 384, 200, 200]]
+        pts_feats = self.extract_pts_feat(points)
         if "MODEL_PARALLELISM" in os.environ:
             device2 = int(os.environ["DEVICE_ID2"])
-            for i, _ in enumerate(img_feats):
-                img_feats[i] = img_feats[i].cuda(device2)
+            for i, _ in enumerate(img_feats_list):
+                img_feats_list[i] = img_feats_list[i].cuda(device2)
             for i, _ in enumerate(pts_feats):
                 pts_feats[i] = pts_feats[i].cuda(device2)
 
         if self.lift:
-            BN, C, H, W = img_feats[0].shape
-            batch_size = BN // self.num_views
-            img_feats_view = img_feats[0].view(batch_size, self.num_views, C, H, W)
-            rots = []
-            trans = []
-            for sample_idx in range(batch_size):
-                rot_list = []
-                trans_list = []
+            img_bev_feats, depth_dists = [], []
+            for sample_idx, img_feats in enumerate(img_feats_list):
+                BN, C, H, W = img_feats.shape
+                num_views = num_views_per_sample[sample_idx]
+                batch_size = BN // num_views
+                img_feats_view = img_feats.view(batch_size, num_views, C, H, W)
+
+                rots = []
+                trans = []
                 for mat in img_metas[sample_idx]["lidar2img"]:
                     mat = torch.Tensor(mat).to(img_feats_view.device)
-                    rot_list.append(mat.inverse()[:3, :3])
-                    trans_list.append(mat.inverse()[:3, 3].view(-1))
-                rot_list = torch.stack(rot_list, dim=0)
-                trans_list = torch.stack(trans_list, dim=0)
-                rots.append(rot_list)
-                trans.append(trans_list)
-            rots = torch.stack(rots)
-            trans = torch.stack(trans)
-            lidar2img_rt = img_metas[sample_idx][
-                "lidar2img"
-            ]  #### extrinsic parameters for multi-view images
+                    rots.append(mat.inverse()[:3, :3])
+                    trans.append(mat.inverse()[:3, 3].view(-1))
+                # [1, 6, 3, 3]
+                rots = torch.stack(rots, dim=0).unsqueeze(0)
+                # [1, 6, 3]
+                trans = torch.stack(trans, dim=0).unsqueeze(0)
 
-            img_bev_feat, depth_dist = self.lift_splat_shot_vis(
-                img_feats_view, rots, trans, lidar2img_rt=lidar2img_rt, img_metas=img_metas
-            )
-            # print(img_bev_feat.shape, pts_feats[-1].shape)
+                # [2, 256, 200, 200], [2, 6, 41, 112, 200]
+                img_bev_feat, depth_dist = self.lift_splat_shot_vis(
+                    img_feats_view, rots, trans, img_metas=img_metas, sample_idx=sample_idx
+                )
+                img_bev_feats.append(img_bev_feat)
+                depth_dists.append(depth_dist)
+            img_bev_feat = torch.cat(img_bev_feats)
+
             if pts_feats is None:
                 pts_feats = [img_bev_feat]  ####cam stream only
             else:
@@ -181,11 +194,12 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                             mode="bilinear",
                             align_corners=True,
                         )
+                    # [2, 640, 200, 200] reduce to [2, 384, 200, 200]
                     pts_feats = [self.reduc_conv(torch.cat([img_bev_feat, pts_feats[0]], dim=1))]
                     if self.se:
+                        # [2, 384, 200, 200]
                         pts_feats = [self.seblock(pts_feats[0])]
-        return dict(img_feats=img_feats, pts_feats=pts_feats, depth_dist=depth_dist)
-        # return (img_feats, pts_feats, depth_dist)
+        return dict(img_feats=img_feats_list, pts_feats=pts_feats, depth_dist=depth_dists)
 
     def simple_test(self, points, img_metas, img=None, rescale=False):
         """Test function without augmentaiton."""
@@ -258,6 +272,8 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
 
         losses = dict()
         if pts_feats:
+            # gt_bboxes_3d: [LiDARInstance3DBoxes[7, 9], LiDARInstance3DBoxes[5, 9]]
+            # gt_labels_3d: [[7], [5]]
             losses_pts = self.forward_pts_train(
                 pts_feats, gt_bboxes_3d, gt_labels_3d, img_metas, gt_bboxes_ignore
             )
@@ -272,6 +288,8 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                 proposals=proposals,
             )
             if img_depth is not None:
+                # depth_dist: [2, 6, 41, 112, 200]
+                # img_depth (gt): [2, 6, 112, 200, 42]
                 loss_depth = (
                     self.depth_dist_loss(
                         depth_dist, img_depth, loss_method=self.img_depth_loss_method, img=img
@@ -282,21 +300,23 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
             losses.update(losses_img)
         return losses
 
-    def depth_dist_loss(self, predict_depth_dist, gt_depth, loss_method="kld", img=None):
-        # predict_depth_dist: B, N, D, H, W
-        # gt_depth: B, N, H', W'
-        B, N, D, H, W = predict_depth_dist.shape
-        guassian_depth, min_depth = gt_depth[..., 1:], gt_depth[..., 0]
-        mask = (min_depth >= self.camera_depth_range[0]) & (min_depth <= self.camera_depth_range[1])
-        mask = mask.view(-1)
-        guassian_depth = guassian_depth.view(-1, D)[mask]
-        predict_depth_dist = predict_depth_dist.permute(0, 1, 3, 4, 2).reshape(-1, D)[mask]
-        if loss_method == "kld":
-            loss = F.kl_div(
-                torch.log(predict_depth_dist), guassian_depth, reduction="mean", log_target=False
-            )
-        elif loss_method == "mse":
-            loss = F.mse_loss(predict_depth_dist, guassian_depth)
-        else:
-            raise NotImplementedError
-        return loss
+    def depth_dist_loss(self, predict_depth_dists, gt_depths, loss_method="kld", img=None):
+        loss = 0
+        batch_size = len(gt_depths)
+        for predict_depth_dist, gt_depth in zip(predict_depth_dists, gt_depths):
+            # predict_depth_dist: B, N, D, H, W # gt_depth: B, N, H', W'
+            B, N, D, H, W = predict_depth_dist.shape
+            guassian_depth, min_depth = gt_depth[..., 1:], gt_depth[..., 0]
+            mask = (min_depth >= self.camera_depth_range[0]) & (min_depth <= self.camera_depth_range[1])
+            mask = mask.view(-1)
+            guassian_depth = guassian_depth.view(-1, D)[mask]
+            predict_depth_dist = predict_depth_dist.permute(0, 1, 3, 4, 2).reshape(-1, D)[mask]
+            if loss_method == "kld":
+                loss += F.kl_div(
+                    torch.log(predict_depth_dist), guassian_depth, reduction="mean", log_target=False
+                )
+            elif loss_method == "mse":
+                loss += F.mse_loss(predict_depth_dist, guassian_depth)
+            else:
+                raise NotImplementedError
+        return loss / batch_size

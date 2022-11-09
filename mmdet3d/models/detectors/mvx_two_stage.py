@@ -175,23 +175,27 @@ class MVXTwoStageDetector(Base3DDetector):
         """bool: Whether the detector has a middle encoder."""
         return hasattr(self, "middle_encoder") and self.middle_encoder is not None
 
-    def extract_img_feat(self, img, img_metas):
+    def extract_img_feat(self, img, img_metas, idx):
         """Extract features of images."""
         if self.with_img_backbone and img is not None:
             input_shape = img.shape[-2:]
             # update real input shape of each single img
-            for img_meta in img_metas:
-                img_meta.update(input_shape=input_shape)
+            # for img_meta in img_metas:
+            #     img_meta.update(input_shape=input_shape)
+            img_metas[idx].update(input_shape=input_shape)
 
             if img.dim() == 5 and img.size(0) == 1:
                 img.squeeze_(0)
             elif img.dim() == 5 and img.size(0) > 1:
                 B, N, C, H, W = img.size()
+                # [12, 3, 448, 800]
                 img = img.view(B * N, C, H, W)
+            # [[12, 96, 112, 200], [12, 192, 56, 100], [12, 384, 28, 50], [12, 768, 14, 25]]
             img_feats = self.img_backbone(img.float())
         else:
             return None
         if self.with_img_neck:
+            # [[12, 256, 112, 200]]
             img_feats = self.img_neck(img_feats)
         return img_feats
 
@@ -199,14 +203,17 @@ class MVXTwoStageDetector(Base3DDetector):
         """Extract features of points."""
         if not self.with_pts_bbox:
             return None
-        voxels, num_points, coors = self.voxelize(
-            pts
-        )  # torch.Size([13909, 64, 4]) torch.Size([13909]) torch.Size([13909, 4])
+        # [13909, 64, 4], [13909], [13909, 4]
+        voxels, num_points, coors = self.voxelize(pts)
+        # 用聚类中心距离和voxel中心点距离增广voxel feature, 并对每个voxel执行max pooling
         voxel_features = self.pts_voxel_encoder(voxels, num_points, coors, img_feats, img_metas)
         batch_size = coors[-1, 0] + 1
+        # [B, 64, 400, 400]: 根据坐标将voxel的特征分配到指定的2D位置
         x = self.pts_middle_encoder(voxel_features, coors, batch_size)
+        # ([3, 64, 200, 200], [3, 128, 100, 100], [3, 256, 50, 50])
         x = self.pts_backbone(x)
         if self.with_pts_neck:
+            # [3, 384, 200, 200]
             x = self.pts_neck(x)
 
         return x
@@ -232,6 +239,7 @@ class MVXTwoStageDetector(Base3DDetector):
         """
         voxels, coors, num_points = [], [], []
         for res in points:
+            # [6784, 64, 4], [6784, 3], [6784]
             res_voxels, res_coors, res_num_points = self.pts_voxel_layer(res)
             voxels.append(res_voxels)
             coors.append(res_coors)
@@ -331,6 +339,8 @@ class MVXTwoStageDetector(Base3DDetector):
         # outs = self.pts_bbox_head(pts_feats, img_feats, img_metas)
         # loss_inputs = [gt_bboxes_3d, gt_labels_3d, outs]
         # losses = self.pts_bbox_head.loss(*loss_inputs)
+        # cls_score, bbox_pred, dir_pred
+        # [[[2, 140, 200, 200]], [[2, 126, 200, 200]], [[2, 28, 200, 200]]]
         outs = self.pts_bbox_head(pts_feats)
         loss_inputs = outs + (gt_bboxes_3d, gt_labels_3d, img_metas)
         losses = self.pts_bbox_head.loss(*loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)

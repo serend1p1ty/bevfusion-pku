@@ -24,6 +24,7 @@ from .scannet_dataset import ScanNetDataset
 from .semantickitti_dataset import SemanticKITTIDataset
 from .sunrgbd_dataset import SUNRGBDDataset
 from .waymo_dataset import WaymoDataset
+from .xdq_dataset import XdqDataset
 
 __all__ = [
     "KittiDataset",

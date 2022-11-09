@@ -119,9 +119,12 @@ def map_pointcloud_to_image(
 
     # Fifth step: actually take a "picture" of the point cloud.
     # Grab the depths (camera frame z axis points away from the camera).
+    # points: [4, 382080]
     depths = points[2, :]
+    # depths, coloring: 相机坐标系3D点的Z坐标
     coloring = depths
     # Take the actual picture (matrix multiplication with camera-matrix + renormalization).
+    # 从相机坐标系投影到图片坐标系
     points = view_points(points[:3, :], camera_intrinsic, normalize=True)
 
     # Remove points that are either outside or behind the camera. Leave a margin of 1 pixel for aesthetic reasons.
@@ -133,6 +136,7 @@ def map_pointcloud_to_image(
     mask = np.logical_and(mask, points[0, :] < img.shape[1] - 1)
     mask = np.logical_and(mask, points[1, :] > 1)
     mask = np.logical_and(mask, points[1, :] < img.shape[0] - 1)
+    assert mask.sum() > 100
     points = points[:, mask]
     coloring = coloring[mask]
     depth_map = np.zeros((img.shape[0], img.shape[1]), dtype=np.float32)
@@ -149,6 +153,7 @@ def map_pointcloud_to_image(
         ax.scatter(points[0, :], points[1, :], c=coloring, s=1)
         ax.axis("off")
         fig.savefig("work_dirs/img_depth.png", bbox_inches="tight", pad_inches=0)
+        cv2.imwrite("work_dirs/img.png", img)
     return depth_map
 
 

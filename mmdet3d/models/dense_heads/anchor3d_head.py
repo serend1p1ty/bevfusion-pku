@@ -331,11 +331,18 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
                 - loss_dir (list[torch.Tensor]): Direction classification \
                     losses.
         """
+        # [[200, 200]]
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         assert len(featmap_sizes) == self.anchor_generator.num_levels
         device = cls_scores[0].device
+        # [[[560000, 9]], [[560000, 9]]]
         anchor_list = self.get_anchors(featmap_sizes, input_metas, device=device)
+        # 140
         label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1
+        # labels ([[2, 560000]]), label weights ([[2, 560000]]), bbox targets ([[2, 560000, 9]]),
+        # bbox weights ([[2, 560000, 9]]), direction targets ([2, 560000]),
+        # direction weights ([2, 560000]), number of postive anchors (28),
+        # number of negative anchors (1119714)
         cls_reg_targets = self.anchor_target_3d(
             anchor_list,
             gt_bboxes,

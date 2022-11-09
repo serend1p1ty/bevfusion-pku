@@ -297,7 +297,20 @@ def main():
         ckpt = state_dict
         new_ckpt = OrderedDict()
         for k, v in ckpt.items():
-            if k.startswith("pts_bbox_head"):
+            if k.startswith("pts_bbox_head") or k in [
+                "lift_splat_shot_vis.dx",
+                "lift_splat_shot_vis.bx",
+                "lift_splat_shot_vis.nx",
+                "lift_splat_shot_vis.frustum",
+                "lift_splat_shot_vis.camencode.depthnet.weight",
+                "lift_splat_shot_vis.camencode.depthnet.bias",
+                "lift_splat_shot_vis.bevencode.0.weight",
+                "lift_splat_shot_vis.bevencode.1.weight",
+                "lift_splat_shot_vis.bevencode.1.bias",
+                "lift_splat_shot_vis.bevencode.1.running_mean",
+                "lift_splat_shot_vis.bevencode.1.running_var",
+                "lift_splat_shot_vis.bevencode.3.weight",
+            ]:
                 continue
             else:
                 new_v = v

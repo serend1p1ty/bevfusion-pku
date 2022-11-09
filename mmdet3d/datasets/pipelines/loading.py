@@ -9,6 +9,17 @@ from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines import LoadAnnotations
 import os
 
+norm_offsets = {
+    "2": [-29.47, 32.36, 45.5],
+    "3": [-14.57, 73.2, 45.24],
+    "12": [181.5, -80.63, 45.93],
+    "21": [13.57, 73.88, 45.45],
+    "32": [56.18, 5.57, 45.58],
+    "33": [-57.96, -7.58, 45.62],
+    "34": [-6.65, -23.98, 45.46],
+    "35": [63.9, 51.86, 45.73],
+}
+
 
 @PIPELINES.register_module()
 class MyResize(object):
@@ -491,8 +502,13 @@ class LoadMultiViewImageFromFiles(object):
             results["img_depth"] = []
             for i in range(len(results["img"])):
                 # project_pts_on_img(results['points'].tensor.numpy(), results['img'][i], results['lidar2img'][i])
+                # 从磁盘读取的是归一化后的点云，需要撤销归一化，否则投影不准。
+                nid = results["nid"]
+                norm_offset = norm_offsets[nid]
+                points = results["points"].tensor.numpy().copy()
+                points[:, :3] -= norm_offset
                 depth = map_pointcloud_to_image(
-                    results["points"].tensor.numpy(),
+                    points,
                     results["img"][i],
                     results["caminfo"][i]["sensor2lidar_rotation"],
                     results["caminfo"][i]["sensor2lidar_translation"],
@@ -1010,6 +1026,8 @@ class LoadPointsFromFile(object):
         Returns:
             np.ndarray: An array containing point clouds data.
         """
+        if pts_filename.endswith(".npy"):
+            return np.load(pts_filename)
         if self.file_client is None:
             self.file_client = mmcv.FileClient(**self.file_client_args)
         try:
@@ -1038,7 +1056,13 @@ class LoadPointsFromFile(object):
         """
         pts_filename = results["pts_filename"]
         points = self._load_points(pts_filename)
-        points = points.reshape(-1, self.load_dim)
+        if len(points.shape) == 2:
+            # load_dim一般设置为5，xdq点云只有4个维度，所以需要padding
+            if points.shape[1] < self.load_dim:
+                padding = np.zeros((points.shape[0], self.load_dim - points.shape[1]))
+                points = np.hstack((points, padding))
+        else:
+            points = points.reshape(-1, self.load_dim)
         points = points[:, self.use_dim]
         attribute_dims = None
 

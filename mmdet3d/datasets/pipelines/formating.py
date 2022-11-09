@@ -49,22 +49,24 @@ class DefaultFormatBundle(object):
                 # print(len(results['img']), [im.shape for im in results['img']], 'list')
                 imgs = [img.transpose(2, 0, 1) for img in results["img"]]
                 imgs = np.ascontiguousarray(np.stack(imgs, axis=0))
-                results["img"] = DC(to_tensor(imgs), stack=True)
+                # 每个路口的相机数目不一定相同，所以设置stack=False
+                results["img"] = DC(to_tensor(imgs), stack=False)
             else:
                 # print(results['img'].shape, 'notlist')
                 img = np.ascontiguousarray(results["img"].transpose(2, 0, 1))
-                results["img"] = DC(to_tensor(img), stack=True)
+                results["img"] = DC(to_tensor(img), stack=False)
         if "img_depth" in results:
             # print(isinstance(results['img'], list), 'format')
             if isinstance(results["img_depth"], list):
                 # process multiple imgs in single frame
                 # print(len(results['img']), [im.shape for im in results['img']], 'list')
                 imgs = np.ascontiguousarray(np.stack(results["img_depth"], axis=0))
-                results["img_depth"] = DC(to_tensor(imgs), stack=True)
+                # 和"img"相同, 设置stack=False
+                results["img_depth"] = DC(to_tensor(imgs), stack=False)
             else:
                 # print(results['img'].shape, 'notlist')
                 img = np.ascontiguousarray(results["img_depth"])
-                results["img_depth"] = DC(to_tensor(img), stack=True)
+                results["img_depth"] = DC(to_tensor(img), stack=False)
         for key in [
             "proposals",
             "gt_bboxes",
@@ -176,6 +178,10 @@ class Collect3D(object):
             "pts_filename",
             "transformation_3d_flow",
             "caminfo",
+            # 可视化脚本需要
+            "img_filename",
+            "ann_info",
+            "nid",
         ),
     ):
         self.keys = keys

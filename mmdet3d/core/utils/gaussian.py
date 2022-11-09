@@ -87,18 +87,23 @@ def gaussian_radius(det_size, min_overlap=0.5):
 
 
 def generate_guassian_depth_target(depth, stride, cam_depth_range, constant_std=None):
+    # [1, 900, 1600]
     B, tH, tW = depth.shape
+    # 8
     kernel_size = stride
     center_idx = kernel_size * kernel_size // 2
     H = tH // stride
     W = tW // stride
+    # [1, 64, 22400]
     unfold_depth = F.unfold(
         depth.unsqueeze(1), kernel_size, dilation=1, padding=0, stride=stride
     )  # B, Cxkxk, HxW
+    # [1, 112, 200, 64]
     unfold_depth = unfold_depth.view(B, -1, H, W).permute(0, 2, 3, 1).contiguous()  # B, H, W, kxk
     valid_mask = unfold_depth != 0  # BN, H, W, kxk
 
     valid_mask_f = valid_mask.float()  # BN, H, W, kxk
+    # [1, 112, 200]
     valid_num = torch.sum(valid_mask_f, dim=-1)  # BN, H, W
     valid_num[valid_num == 0] = 1e10
     if constant_std is None:
@@ -121,6 +126,8 @@ def generate_guassian_depth_target(depth, stride, cam_depth_range, constant_std=
     for i in x:
         cdf = dist.cdf(i)
         cdfs.append(cdf)
+    # [1, 112, 200, 42]
     cdfs = torch.stack(cdfs, dim=-1)
+    # [1, 112, 200, 41]
     depth_dist = cdfs[..., 1:] - cdfs[..., :-1]
     return depth_dist, min_depth, std_var
