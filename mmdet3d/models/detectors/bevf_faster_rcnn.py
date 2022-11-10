@@ -79,8 +79,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                 lss=lss,
                 grid=grid,
                 inputC=imc,
-                # 原本是64，设置为32减少显存占用
-                camC=32,
+                camC=64,
                 camera_depth_range=camera_depth_range,
                 pc_range=pc_range,
                 final_dim=final_dim,
@@ -140,6 +139,9 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
             # [[352164, 4], [366130, 4]]
             for i, _ in enumerate(points):
                 points[i] = points[i].cuda(device1)
+        else:
+            for i, _ in enumerate(img):
+                img[i] = img[i].unsqueeze(0)
         # [[12, 256, 112, 200]]
         # img_feats = self.extract_img_feat(img, img_metas)
         num_views_per_sample = []
@@ -149,12 +151,6 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
             img_feats_list.extend(self.extract_img_feat(img_i, img_metas, i))
         # [[2, 384, 200, 200]]
         pts_feats = self.extract_pts_feat(points)
-        if "MODEL_PARALLELISM" in os.environ:
-            device2 = int(os.environ["DEVICE_ID2"])
-            for i, _ in enumerate(img_feats_list):
-                img_feats_list[i] = img_feats_list[i].cuda(device2)
-            for i, _ in enumerate(pts_feats):
-                pts_feats[i] = pts_feats[i].cuda(device2)
 
         if self.lift:
             img_bev_feats, depth_dists = [], []
@@ -182,6 +178,13 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                 img_bev_feats.append(img_bev_feat)
                 depth_dists.append(depth_dist)
             img_bev_feat = torch.cat(img_bev_feats)
+
+            if "MODEL_PARALLELISM" in os.environ:
+                device2 = int(os.environ["DEVICE_ID2"])
+                for i, _ in enumerate(depth_dists):
+                    depth_dists[i] = depth_dists[i].cuda(device2)
+                for i, _ in enumerate(pts_feats):
+                    pts_feats[i] = pts_feats[i].cuda(device2)
 
             if pts_feats is None:
                 pts_feats = [img_bev_feat]  ####cam stream only
@@ -235,10 +238,12 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                 or "pts_middle_encoder" in name
                 or "pts_backbone" in name
                 or "pts_neck" in name
+                or "lift_splat_shot_vis" in name
             ):
                 module.cuda(device1)
             else:
                 module.cuda(device2)
+        self.lift_splat_shot_vis.bevencode.cuda(device2)
         return self
 
     def forward_train(self, *args, **kwargs):
@@ -279,14 +284,14 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
             )
             losses.update(losses_pts)
         if img_feats:
-            losses_img = self.forward_img_train(
-                img_feats,
-                img_metas=img_metas,
-                gt_bboxes=gt_bboxes,
-                gt_labels=gt_labels,
-                gt_bboxes_ignore=gt_bboxes_ignore,
-                proposals=proposals,
-            )
+            # losses_img = self.forward_img_train(
+            #     img_feats,
+            #     img_metas=img_metas,
+            #     gt_bboxes=gt_bboxes,
+            #     gt_labels=gt_labels,
+            #     gt_bboxes_ignore=gt_bboxes_ignore,
+            #     proposals=proposals,
+            # )
             if img_depth is not None:
                 # depth_dist: [2, 6, 41, 112, 200]
                 # img_depth (gt): [2, 6, 112, 200, 42]
@@ -297,7 +302,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                     * self.img_depth_loss_weight
                 )
                 losses.update(img_depth_loss=loss_depth)
-            losses.update(losses_img)
+            # losses.update(losses_img)
         return losses
 
     def depth_dist_loss(self, predict_depth_dists, gt_depths, loss_method="kld", img=None):

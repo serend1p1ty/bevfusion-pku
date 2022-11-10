@@ -4,6 +4,7 @@ Licensed under the NVIDIA Source Code License. See LICENSE at https://github.com
 Authors: Jonah Philion and Sanja Fidler
 """
 
+import os
 import torch
 from torch import nn
 from torchvision.models.resnet import resnet18
@@ -383,5 +384,8 @@ class LiftSplatShoot(nn.Module):
         bev = self.s2c(x)
         # 1024 -> camC (64) -> inputC (256)
         # [2, 256, 200, 200]
+        if "MODEL_PARALLELISM" in os.environ:
+            device2 = int(os.environ["DEVICE_ID2"])
+            bev = bev.to(device2)
         x = self.bevencode(bev)
         return x, depth
