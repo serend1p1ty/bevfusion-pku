@@ -127,4 +127,4 @@ exps/
 *.obj
 *.ply
 ossutil_output
-vis_*/
+vis_outputs

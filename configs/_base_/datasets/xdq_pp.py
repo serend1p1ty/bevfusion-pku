@@ -1,5 +1,19 @@
 #### modified ####
 point_cloud_range = [-160.0, -160.0, -6.0, 160.0, 160.0, 4.0]
+#### modified ####
+# XDQ point cloud has been normalized offline, and stored in disk (*_norm.npy)
+# The variable is used to normalize image LSS point cloud online and
+# unnormalize prediction result.
+norm_offsets = {
+    "2": [-29.47, 32.36, 45.5],
+    "3": [-14.57, 73.2, 45.24],
+    "12": [181.5, -80.63, 45.93],
+    "21": [13.57, 73.88, 45.45],
+    "32": [56.18, 5.57, 45.58],
+    "33": [-57.96, -7.58, 45.62],
+    "34": [-6.65, -23.98, 45.46],
+    "35": [63.9, 51.86, 45.73],
+}
 class_names = [
     "car",
     "truck",

@@ -118,7 +118,6 @@ class XdqDetectionEval(DetectionEval):
 
     @staticmethod
     def load_gt(data_infos, box_cls, with_unknown_boxes=False):
-        # data_infos = data_infos[:1]
         all_annotations = EvalBoxes()
         for info in data_infos:
             _gt_bboxes = [corners2wlhr(obj["3d_box"]) for obj in info["lidar_objs"]]

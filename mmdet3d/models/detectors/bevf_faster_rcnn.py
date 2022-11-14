@@ -312,13 +312,18 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
             # predict_depth_dist: B, N, D, H, W # gt_depth: B, N, H', W'
             B, N, D, H, W = predict_depth_dist.shape
             guassian_depth, min_depth = gt_depth[..., 1:], gt_depth[..., 0]
-            mask = (min_depth >= self.camera_depth_range[0]) & (min_depth <= self.camera_depth_range[1])
+            mask = (min_depth >= self.camera_depth_range[0]) & (
+                min_depth <= self.camera_depth_range[1]
+            )
             mask = mask.view(-1)
             guassian_depth = guassian_depth.view(-1, D)[mask]
             predict_depth_dist = predict_depth_dist.permute(0, 1, 3, 4, 2).reshape(-1, D)[mask]
             if loss_method == "kld":
                 loss += F.kl_div(
-                    torch.log(predict_depth_dist), guassian_depth, reduction="mean", log_target=False
+                    torch.log(predict_depth_dist),
+                    guassian_depth,
+                    reduction="mean",
+                    log_target=False,
                 )
             elif loss_method == "mse":
                 loss += F.mse_loss(predict_depth_dist, guassian_depth)

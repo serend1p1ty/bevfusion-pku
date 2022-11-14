@@ -7,7 +7,7 @@ from copy import deepcopy
 from glob import glob
 from tqdm import tqdm
 
-# 由cal_xyz_offset()计算得到，用来将点云归一化到以原点为中心，z=-5为接地面
+# calculated by cal_xyz_offset(), used to normalize point cloud to origin-centered, z=-5 grounded
 norm_offsets = {
     "2": [-29.47, 32.36, 45.5],
     "3": [-14.57, 73.2, 45.24],
@@ -38,7 +38,7 @@ def cal_xyz_offset():
     nid2offsets = {}
     anno_files = glob(os.path.join(anno_dir, "*/*.json"))
     for anno_file in tqdm(anno_files):
-        # 0720是老版本标注格式
+        # 0720 is the old annotation version
         if "20220720" in anno_file:
             continue
 
@@ -59,12 +59,12 @@ def cal_xyz_offset():
         for obj in anno["lidar_objs"]:
             # (8, 3)
             box_corners = np.asarray(obj["3d_box"], dtype=np.float64)
-            # 过滤掉LiDAR点数目小于5的目标
+            # filter those objects with less than 5 LiDAR points
             points_in_box = get_points_in_box(points, box_corners)
             if points_in_box.shape[0] < 5:
                 continue
             gt_boxes_corners.append(box_corners)
-        # 当前帧所有目标的LiDAR点数目都小于5
+        # all objects in current frame contain less than 5 LiDAR points
         if len(gt_boxes_corners) == 0:
             continue
         # (M, 8, 3) -> (Mx8, 3)
@@ -113,7 +113,7 @@ def normalize_coordinate():
         pcd_path = os.path.join(data_dir, pcd_relative_path)
         points = np.load(pcd_path)
 
-        # 归一化标注文件中的gt box坐标
+        # normalize the coordinates of gt boxes
         norm_anno = deepcopy(anno)
         norm_anno["lidar_objs"] = []
         for obj in anno["lidar_objs"]:
@@ -121,7 +121,7 @@ def normalize_coordinate():
                 continue
             box_corners = np.asarray(obj["3d_box"], dtype=np.float64)
             total_box_cnt += 1
-            # 过滤掉LiDAR点数目小于5的目标
+            # filter those objects with less than 5 LiDAR points
             points_in_box = get_points_in_box(points, box_corners)
             if points_in_box.shape[0] < 5:
                 invalid_box_cnt += 1
@@ -129,14 +129,14 @@ def normalize_coordinate():
             norm_box = box_corners + norm_offset
             obj["3d_box"] = norm_box.tolist()
             norm_anno["lidar_objs"].append(obj)
-        # 当前帧所有目标的LiDAR点数目都小于5
+        # all objects in current frame contain less than 5 LiDAR points
         if len(norm_anno["lidar_objs"]) == 0:
             continue
 
         save_path = anno_file.replace(".json", "_norm.json")
         json.dump(norm_anno, open(save_path, "w"), indent=4)
 
-        # 归一化点云坐标
+        # normalize the coordinates of point cloud
         points += norm_offset + [0.0]
         save_path = pcd_path.replace(".npy", "_norm.npy")
         np.save(save_path, points)

@@ -66,10 +66,6 @@ def visualize_camera(
         coords = coords[indices]
         labels = labels[indices]
 
-        indices = np.argsort(-np.min(coords[..., 2], axis=1))
-        coords = coords[indices]
-        labels = labels[indices]
-
         coords = coords.reshape(-1, 4)
         coords[:, 2] = np.clip(coords[:, 2], a_min=1e-5, a_max=1e5)
         coords[:, 0] /= coords[:, 2]
@@ -109,7 +105,7 @@ def visualize_camera(
 
 def visualize_lidar(
     fpath: str,
-    lidar: Optional[np.ndarray] = None,
+    lidar_points: Optional[np.ndarray] = None,
     *,
     bboxes: Optional[LiDARInstance3DBoxes] = None,
     labels: Optional[np.ndarray] = None,
@@ -119,9 +115,9 @@ def visualize_lidar(
     color: Optional[Tuple[int, int, int]] = None,
     radius: float = 15,
     thickness: float = 25,
+    draw_origin: bool = False,
 ) -> None:
-    # fig = plt.figure(figsize=(xlim[1] - xlim[0], ylim[1] - ylim[0]))
-    fig = plt.figure(figsize=(300, 300))
+    fig = plt.figure(figsize=(xlim[1] - xlim[0], ylim[1] - ylim[0]))
 
     ax = plt.gca()
     ax.set_xlim(*xlim)
@@ -129,10 +125,10 @@ def visualize_lidar(
     ax.set_aspect(1)
     ax.set_axis_off()
 
-    if lidar is not None:
+    if lidar_points is not None:
         plt.scatter(
-            lidar[:, 0],
-            lidar[:, 1],
+            lidar_points[:, 0],
+            lidar_points[:, 1],
             s=radius,
             c="white",
         )
@@ -148,8 +144,9 @@ def visualize_lidar(
                 color=np.array(color or OBJECT_PALETTE[name]) / 255,
             )
 
-    plt.plot((0, 0), (0, 10), linewidth=50, color=(0, 1, 0))
-    plt.plot((0, 10), (0, 0), linewidth=50, color=(0, 0, 1))
+    if draw_origin:
+        plt.plot((0, 0), (0, 10), linewidth=50, color=(0, 1, 0))
+        plt.plot((0, 10), (0, 0), linewidth=50, color=(0, 0, 1))
 
     mmcv.mkdir_or_exist(os.path.dirname(fpath))
     fig.savefig(

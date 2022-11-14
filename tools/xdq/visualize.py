@@ -1,28 +1,17 @@
 import argparse
-import mmcv
-import numpy as np
 import os
+import mmcv
 import torch
-from mmcv import Config
-from mmcv.parallel import MMDistributedDataParallel
-from mmcv.runner import init_dist, load_checkpoint
+import numpy as np
 from tqdm import tqdm
+from mmcv import Config
+from mmcv.parallel import MMDistributedDataParallel, MMDataParallel
+from mmcv.runner import init_dist, load_checkpoint
 
 from mmdet3d.core import LiDARInstance3DBoxes
 from mmdet3d.core.utils import visualize_camera, visualize_lidar
 from mmdet3d.datasets import build_dataloader, build_dataset
 from mmdet3d.models import build_detector
-
-norm_offsets = {
-    "2": [-29.47, 32.36, 45.5],
-    "3": [-14.57, 73.2, 45.24],
-    "12": [181.5, -80.63, 45.93],
-    "21": [13.57, 73.88, 45.45],
-    "32": [56.18, 5.57, 45.58],
-    "33": [-57.96, -7.58, 45.62],
-    "34": [-6.65, -23.98, 45.46],
-    "35": [63.9, 51.86, 45.73],
-}
 
 
 def parse_args():
@@ -33,7 +22,7 @@ def parse_args():
     parser.add_argument("--split", type=str, default="test", choices=["train", "val", "test"])
     parser.add_argument("--bbox-classes", nargs="+", type=int, default=None)
     parser.add_argument("--bbox-score", type=float, default=None)
-    parser.add_argument("--out-dir", type=str, default="vis")
+    parser.add_argument("--out-dir", type=str, default="vis_output")
     parser.add_argument(
         "--launcher",
         choices=["none", "pytorch", "slurm", "mpi"],
@@ -58,11 +47,8 @@ def main():
         distributed = True
         init_dist(args.launcher, **cfg.dist_params)
 
-    if args.mode == "pred":
-        assert distributed, "The script only support distributed prediction."
-
     # build the dataloader
-    dataset = build_dataset(cfg.data.get(args.split))
+    dataset = build_dataset(cfg.data[args.split])
     data_loader = build_dataloader(
         dataset,
         samples_per_gpu=1,
@@ -75,21 +61,23 @@ def main():
     if args.mode == "pred":
         model = build_detector(cfg.model, test_cfg=cfg.get("test_cfg"))
         load_checkpoint(model, args.checkpoint, map_location="cpu")
-        model = MMDistributedDataParallel(
-            model.cuda(), device_ids=[torch.cuda.current_device()], broadcast_buffers=False
-        )
+        if not distributed:
+            model = MMDataParallel(model, device_ids=[0])
+        else:
+            model = MMDistributedDataParallel(
+                model.cuda(), device_ids=[torch.cuda.current_device()], broadcast_buffers=False
+            )
         model.eval()
 
     for data in tqdm(data_loader):
-        metas = (
-            data["img_metas"][0].data[0][0]
-            if isinstance(data["img_metas"], list)
-            else data["img_metas"].data[0][0]
-        )
+        if isinstance(data["img_metas"], list):
+            metas = data["img_metas"][0].data[0][0]  # val/test split
+        else:
+            metas = data["img_metas"].data[0][0]  # train split
         name = metas["sample_idx"]
         ann_info = metas["ann_info"]
         nid = metas["nid"]
-        norm_offset = norm_offsets[nid]
+        norm_offset = cfg.norm_offsets[nid]
 
         if args.mode == "pred":
             with torch.inference_mode():
@@ -129,7 +117,7 @@ def main():
 
         # Unnormalize bboxes coordinates
         if bboxes is not None:
-            bboxes.tensor[:, :3] -= torch.tensor(norm_offset)
+            bboxes.tensor[:, :3] -= torch.Tensor(norm_offset)
 
         if "img_filename" in metas:
             for k, image_path in enumerate(metas["img_filename"]):
@@ -144,16 +132,15 @@ def main():
                 )
 
         if "points" in data:
-            lidar = (
-                data["points"][0].data[0][0].numpy()
-                if isinstance(data["points"], list)
-                else data["points"].data[0][0].numpy()
-            )
+            if isinstance(data["points"], list):
+                lidar_points = data["points"][0].data[0][0].numpy()  # val/test split
+            else:
+                lidar_points = data["points"].data[0][0].numpy()  # train split
             # Unnormalize lidar points coordinates
-            lidar -= norm_offset + [0.0]
+            lidar_points -= norm_offset + [0.0]
             visualize_lidar(
                 os.path.join(args.out_dir, "lidar", f"{name}.png"),
-                lidar,
+                lidar_points,
                 bboxes=bboxes,
                 labels=labels,
                 xlim=[cfg.point_cloud_range[d] for d in [0, 3]],

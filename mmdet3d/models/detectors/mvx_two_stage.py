@@ -220,7 +220,7 @@ class MVXTwoStageDetector(Base3DDetector):
 
     def extract_feat(self, points, img, img_metas, gt_bboxes_3d=None):
         """Extract features from images and points."""
-        img_feats = self.extract_img_feat(img, img_metas)
+        img_feats = self.extract_img_feat(img, img_metas, None)
         # pts_feats = self.extract_pts_feat(points, img_feats, img_metas, gt_bboxes_3d)
         pts_feats = self.extract_pts_feat(points, img_feats, img_metas)
         return (img_feats, pts_feats)
