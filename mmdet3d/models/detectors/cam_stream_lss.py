@@ -16,17 +16,6 @@ from torchvision.utils import save_image
 from mmdet3d.models.fusion_layers import apply_3d_transformation
 import torch.nn.functional as F
 
-norm_offsets = {
-    "2": [-29.47, 32.36, 45.5],
-    "3": [-14.57, 73.2, 45.24],
-    "12": [181.5, -80.63, 45.93],
-    "21": [13.57, 73.88, 45.45],
-    "32": [56.18, 5.57, 45.58],
-    "33": [-57.96, -7.58, 45.62],
-    "34": [-6.65, -23.98, 45.46],
-    "35": [63.9, 51.86, 45.73],
-}
-
 
 class Up(nn.Module):
     def __init__(self, in_channels, out_channels, scale_factor=2):
@@ -169,6 +158,7 @@ class LiftSplatShoot(nn.Module):
         grid=3,
         inputC=256,
         camC=64,
+        norm_offsets=None,
     ):
         """
         Args:
@@ -190,6 +180,7 @@ class LiftSplatShoot(nn.Module):
         }
         self.final_dim = final_dim
         self.grid = grid
+        self.norm_offsets = norm_offsets
 
         dx, bx, nx = gen_dx_bx(
             self.grid_conf["xbound"],
@@ -281,7 +272,7 @@ class LiftSplatShoot(nn.Module):
         points += trans.view(B, N, 1, 1, 1, 3)
 
         assert isinstance(nid, str)
-        norm_offset = torch.Tensor(norm_offsets[nid]).to(points.device)
+        norm_offset = torch.Tensor(self.norm_offsets[nid]).to(points.device)
         # After normalize, -3.1446 <= points_z <= 7.3388, is it normal?
         points += norm_offset
 

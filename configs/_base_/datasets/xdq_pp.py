@@ -54,6 +54,7 @@ train_pipeline = [
         type="LoadMultiViewImageFromFiles",
         project_pts_to_img_depth=True,
         cam_depth_range=[22.0, 90.0, 1.0],
+        norm_offsets=norm_offsets,
     ),
     dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
     dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),

@@ -53,6 +53,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
         downsample=4,
         imc=256,
         lic=384,
+        norm_offsets=None,
         **kwargs
     ):
         """
@@ -84,6 +85,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                 pc_range=pc_range,
                 final_dim=final_dim,
                 downsample=downsample,
+                norm_offsets=norm_offsets,
             )
         if lc_fusion:
             if se:
