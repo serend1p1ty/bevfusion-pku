@@ -19,7 +19,7 @@ from .custom_3d import Custom3DDataset
 from ..core import show_result
 from ..core.bbox import Box3DMode, Coord3DMode, LiDARInstance3DBoxes
 
-# xdq calsses -> nuscenes classes
+# xdq classes -> nuscenes classes
 mapper = {
     "Car": "car",
     "miniCar": "car",
@@ -36,6 +36,41 @@ mapper = {
 }
 
 
+def get_class_name_by_size_l(size_l):
+    if size_l >= 6.0:
+        return "truck"
+    elif 6.0 > size_l >= 2.4:
+        return "car"
+    elif 2.4 > size_l >= 1.0:
+        return "bicycle"
+    else:
+        return "pedestrian"
+
+
+def load_gt_bboxes_and_class_name(info, with_unknown_boxes=False, with_hard_boxes=False):
+    _gt_bboxes = [corners2xyzwlhr(obj["3d_box"]) for obj in info["lidar_objs"]]
+    _gt_names = [obj["type"] for obj in info["lidar_objs"]]
+    _gt_num_pts = [obj["num_pts"] for obj in info["lidar_objs"]]
+    gt_bboxes_3d, gt_names_3d = [], []
+    for gt_bbox, gt_name, gt_num_pts in zip(_gt_bboxes, _gt_names, _gt_num_pts):
+        # check if the box is valid
+        if gt_name == "Unknown" and not with_unknown_boxes:
+            continue
+        if gt_num_pts < 5 and not with_hard_boxes:
+            continue
+
+        # the box is valid
+        gt_bboxes_3d.append(gt_bbox)
+        if gt_name == "Unknown":
+            # assign class name by box length
+            size_l = gt_bbox[4]
+            gt_names_3d.append(get_class_name_by_size_l(size_l))
+        else:
+            gt_names_3d.append(mapper[gt_name])
+    gt_bboxes_3d = np.array(gt_bboxes_3d)
+    return gt_bboxes_3d, gt_names_3d
+
+
 class XdqDetectionEval(DetectionEval):
     def __init__(
         self,
@@ -44,6 +79,7 @@ class XdqDetectionEval(DetectionEval):
         result_path,
         eval_set,
         with_unknown_boxes=False,
+        with_hard_boxes=False,
         output_dir=None,
         verbose=True,
     ):
@@ -69,7 +105,7 @@ class XdqDetectionEval(DetectionEval):
         self.pred_boxes, self.meta = load_prediction(
             self.result_path, self.cfg.max_boxes_per_sample, DetectionBox, verbose=verbose
         )
-        self.gt_boxes = self.load_gt(data_infos, DetectionBox, with_unknown_boxes)
+        self.gt_boxes = self.load_gt(data_infos, DetectionBox, with_unknown_boxes, with_hard_boxes)
 
         assert set(self.pred_boxes.sample_tokens) == set(
             self.gt_boxes.sample_tokens
@@ -117,30 +153,12 @@ class XdqDetectionEval(DetectionEval):
         return eval_boxes
 
     @staticmethod
-    def load_gt(data_infos, box_cls, with_unknown_boxes=False):
+    def load_gt(data_infos, box_cls, with_unknown_boxes=False, with_hard_boxes=False):
         all_annotations = EvalBoxes()
         for info in data_infos:
-            _gt_bboxes = [corners2wlhr(obj["3d_box"]) for obj in info["lidar_objs"]]
-            _gt_names = [obj["type"] for obj in info["lidar_objs"]]
-            gt_bboxes_3d, gt_names_3d = [], []
-            for gt_bbox, gt_name in zip(_gt_bboxes, _gt_names):
-                if gt_name != "Unknown":
-                    gt_bboxes_3d.append(gt_bbox)
-                    gt_names_3d.append(mapper[gt_name])
-                elif with_unknown_boxes:
-                    gt_bboxes_3d.append(gt_bbox)
-                    # assign class name by box length
-                    size_l = gt_bbox[4]
-                    if size_l >= 6.0:
-                        gt_name = "truck"
-                    elif 6.0 > size_l >= 2.4:
-                        gt_name = "car"
-                    elif 2.4 > size_l >= 1.0:
-                        gt_name = "bicycle"
-                    else:
-                        gt_name = "pedestrian"
-                    gt_names_3d.append(gt_name)
-            gt_bboxes_3d = np.array(gt_bboxes_3d)
+            gt_bboxes_3d, gt_names_3d = load_gt_bboxes_and_class_name(
+                info, with_unknown_boxes, with_hard_boxes
+            )
 
             sample_boxes = []
             for i, gt_bbox in enumerate(gt_bboxes_3d):
@@ -190,6 +208,7 @@ class XdqDataset(Custom3DDataset):
         classes=None,
         modality=None,
         with_unknown_boxes=False,
+        with_hard_boxes=False,
         box_type_3d="LiDAR",
         filter_empty_gt=True,
         test_mode=False,
@@ -198,6 +217,8 @@ class XdqDataset(Custom3DDataset):
         self.timestamps = timestamps
         self.data_dir = osp.join(data_root, "data")
         self.anno_dir = osp.join(data_root, "annotation")
+        self.with_unknown_boxes = with_unknown_boxes
+        self.with_hard_boxes = with_hard_boxes
 
         if modality is None:
             modality = dict(
@@ -215,7 +236,6 @@ class XdqDataset(Custom3DDataset):
             test_mode=test_mode,
         )
 
-        self.with_unknown_boxes = with_unknown_boxes
         self.version = "v1.0-trainval"
         self.eval_version = eval_version
         self.eval_detection_configs = config_factory(eval_version)
@@ -291,27 +311,9 @@ class XdqDataset(Custom3DDataset):
         """
         info = self.data_infos[index]
 
-        _gt_bboxes = [corners2wlhr(obj["3d_box"]) for obj in info["lidar_objs"]]
-        _gt_names = [obj["type"] for obj in info["lidar_objs"]]
-        gt_bboxes_3d, gt_names_3d = [], []
-        for gt_bbox, gt_name in zip(_gt_bboxes, _gt_names):
-            if gt_name != "Unknown":
-                gt_bboxes_3d.append(gt_bbox)
-                gt_names_3d.append(mapper[gt_name])
-            elif self.with_unknown_boxes:
-                gt_bboxes_3d.append(gt_bbox)
-                # assign class name by box length
-                size_l = gt_bbox[4]
-                if size_l >= 6.0:
-                    gt_name = "truck"
-                elif 6.0 > size_l >= 2.4:
-                    gt_name = "car"
-                elif 2.4 > size_l >= 1.0:
-                    gt_name = "bicycle"
-                else:
-                    gt_name = "pedestrian"
-                gt_names_3d.append(gt_name)
-        gt_bboxes_3d = np.array(gt_bboxes_3d)
+        gt_bboxes_3d, gt_names_3d = load_gt_bboxes_and_class_name(
+            info, self.with_unknown_boxes, self.with_hard_boxes
+        )
 
         zero_velocity = np.zeros((gt_bboxes_3d.shape[0], 2))
         gt_bboxes_3d = np.hstack((gt_bboxes_3d, zero_velocity))
@@ -338,11 +340,22 @@ class XdqDataset(Custom3DDataset):
     def load_annotations(self, ann_file):
         data_infos = []
         for ts in self.timestamps:
-            assert osp.isdir(osp.join(self.data_dir, ts))
             assert osp.isdir(osp.join(self.anno_dir, ts))
             anno_files = sorted(list(glob(osp.join(self.anno_dir, ts, "*_norm.json"))))
             for anno_file in anno_files:
                 data_info = json.load(open(anno_file, "r"))
+
+                if not self.with_unknown_boxes or not self.with_hard_boxes:
+                    has_valid_box = False
+                    for obj in data_info["lidar_objs"]:
+                        if obj["type"] == "Unknown" and not self.with_unknown_boxes:
+                            continue
+                        if obj["num_pts"] < 5 and not self.with_hard_boxes:
+                            continue
+                        has_valid_box = True
+                        break
+                    if not has_valid_box:
+                        continue
 
                 pcd_relative_path = re.search(
                     "[^/?]+/[^/?]+/[^/?]+npy", data_info["pcd_path"].replace(".pcd", "_norm.npy")
@@ -439,6 +452,8 @@ class XdqDataset(Custom3DDataset):
             config=self.eval_detection_configs,
             result_path=result_path,
             eval_set=eval_set_map[self.version],
+            with_unknown_boxes=self.with_unknown_boxes,
+            with_hard_boxes=self.with_hard_boxes,
             output_dir=output_dir,
             verbose=True,
         )
@@ -548,7 +563,7 @@ class XdqDataset(Custom3DDataset):
         return res_path
 
 
-def corners2wlhr(corners):
+def corners2xyzwlhr(corners):
     """
       1 -------- 0
      /|         /|

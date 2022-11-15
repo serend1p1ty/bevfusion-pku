@@ -9,14 +9,19 @@ from tqdm import tqdm
 
 # calculated by cal_xyz_offset(), used to normalize point cloud to origin-centered, z=-5 grounded
 norm_offsets = {
-    "2": [-29.47, 32.36, 45.5],
-    "3": [-14.57, 73.2, 45.24],
-    "12": [181.5, -80.63, 45.93],
-    "21": [13.57, 73.88, 45.45],
-    "32": [56.18, 5.57, 45.58],
-    "33": [-57.96, -7.58, 45.62],
-    "34": [-6.65, -23.98, 45.46],
-    "35": [63.9, 51.86, 45.73],
+    "1": [-4.46, -34.1, 45.75],
+    "2": [-23.32, 35.89, 45.75],
+    "3": [-4.64, 71.39, 45.34],
+    "7": [-17.48, -19.43, 45.19],
+    "12": [184.74, -78.32, 45.99],
+    "16": [33.16, 83.63, 46.91],
+    "17": [-18.74, -35.58, 45.41],
+    "19": [-12.4, -52.47, 46.21],
+    "21": [12.77, 71.73, 45.6],
+    "32": [48.12, -0.02, 45.93],
+    "33": [-53.45, -6.59, 45.97],
+    "34": [-8.23, -31.04, 45.71],
+    "35": [63.23, 49.72, 46.03],
 }
 
 
@@ -48,26 +53,13 @@ def cal_xyz_offset():
         anno = json.load(open(anno_file))
         nid = anno["nid"]
 
-        pcd_relative_path = re.search(
-            "[^/?]+/[^/?]+/[^/?]+npy", anno["pcd_path"].replace("pcd", "npy")
-        ).group()
-        pcd_path = os.path.join(data_dir, pcd_relative_path)
-        # (N, 4)
-        points = np.load(pcd_path)
-
-        gt_boxes_corners = []
-        for obj in anno["lidar_objs"]:
-            # (8, 3)
-            box_corners = np.asarray(obj["3d_box"], dtype=np.float64)
-            # filter those objects with less than 5 LiDAR points
-            points_in_box = get_points_in_box(points, box_corners)
-            if points_in_box.shape[0] < 5:
-                continue
-            gt_boxes_corners.append(box_corners)
-        # all objects in current frame contain less than 5 LiDAR points
-        if len(gt_boxes_corners) == 0:
+        if len(anno["lidar_objs"]) == 0:
             continue
-        # (M, 8, 3) -> (Mx8, 3)
+
+        gt_boxes_corners = [
+            np.asarray(obj["3d_box"], dtype=np.float64) for obj in anno["lidar_objs"]
+        ]
+        # (N, 8, 3) -> (Nx8, 3)
         gt_boxes_corners = np.asarray(gt_boxes_corners).reshape(-1, 3)
 
         boxes_min_xyz = gt_boxes_corners.min(axis=0).reshape(-1)
@@ -94,7 +86,6 @@ def cal_xyz_offset():
 
 
 def normalize_coordinate():
-    total_box_cnt = invalid_box_cnt = 0
     anno_files = glob(os.path.join(anno_dir, "*/*.json"))
     for anno_file in tqdm(anno_files):
         if "20220720" in anno_file:
@@ -107,6 +98,9 @@ def normalize_coordinate():
         nid = anno["nid"]
         norm_offset = norm_offsets[nid]
 
+        if len(anno["lidar_objs"]) == 0:
+            continue
+
         pcd_relative_path = re.search(
             "[^/?]+/[^/?]+/[^/?]+npy", anno["pcd_path"].replace("pcd", "npy")
         ).group()
@@ -115,23 +109,13 @@ def normalize_coordinate():
 
         # normalize the coordinates of gt boxes
         norm_anno = deepcopy(anno)
-        norm_anno["lidar_objs"] = []
-        for obj in anno["lidar_objs"]:
-            if obj["type"] == "Unknown":
-                continue
+        for i, obj in enumerate(anno["lidar_objs"]):
             box_corners = np.asarray(obj["3d_box"], dtype=np.float64)
-            total_box_cnt += 1
-            # filter those objects with less than 5 LiDAR points
-            points_in_box = get_points_in_box(points, box_corners)
-            if points_in_box.shape[0] < 5:
-                invalid_box_cnt += 1
-                continue
             norm_box = box_corners + norm_offset
             obj["3d_box"] = norm_box.tolist()
-            norm_anno["lidar_objs"].append(obj)
-        # all objects in current frame contain less than 5 LiDAR points
-        if len(norm_anno["lidar_objs"]) == 0:
-            continue
+            points_in_box = get_points_in_box(points, box_corners)
+            obj["num_pts"] = points_in_box.shape[0]
+            norm_anno["lidar_objs"][i] = obj
 
         save_path = anno_file.replace(".json", "_norm.json")
         json.dump(norm_anno, open(save_path, "w"), indent=4)
@@ -140,7 +124,6 @@ def normalize_coordinate():
         points += norm_offset + [0.0]
         save_path = pcd_path.replace(".npy", "_norm.npy")
         np.save(save_path, points)
-    print(f"invalid boxes: {invalid_box_cnt}, total boxes: {total_box_cnt}")
 
 
 if __name__ == "__main__":

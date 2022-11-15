@@ -7,14 +7,19 @@ point_cloud_range = [-160.0, -160.0, -6.0, 160.0, 160.0, 4.0]
 # The variable is used to normalize image LSS point cloud online and
 # unnormalize prediction result.
 norm_offsets = {
-    "2": [-29.47, 32.36, 45.5],
-    "3": [-14.57, 73.2, 45.24],
-    "12": [181.5, -80.63, 45.93],
-    "21": [13.57, 73.88, 45.45],
-    "32": [56.18, 5.57, 45.58],
-    "33": [-57.96, -7.58, 45.62],
-    "34": [-6.65, -23.98, 45.46],
-    "35": [63.9, 51.86, 45.73],
+    "1": [-4.46, -34.1, 45.75],
+    "2": [-23.32, 35.89, 45.75],
+    "3": [-4.64, 71.39, 45.34],
+    "7": [-17.48, -19.43, 45.19],
+    "12": [184.74, -78.32, 45.99],
+    "16": [33.16, 83.63, 46.91],
+    "17": [-18.74, -35.58, 45.41],
+    "19": [-12.4, -52.47, 46.21],
+    "21": [12.77, 71.73, 45.6],
+    "32": [48.12, -0.02, 45.93],
+    "33": [-53.45, -6.59, 45.97],
+    "34": [-8.23, -31.04, 45.71],
+    "35": [63.23, 49.72, 46.03],
 }
 # For nuScenes we usually do 10-class detection
 class_names = [
@@ -34,7 +39,7 @@ data_root = "data/xdq/"
 # Input modality for nuScenes dataset, this is consistent with the submission
 # format which requires the information in input_modality.
 input_modality = dict(
-    use_lidar=True, use_camera=False, use_radar=False, use_map=False, use_external=False
+    use_lidar=True, use_camera=True, use_radar=False, use_map=False, use_external=False
 )
 file_client_args = dict(backend="disk")
 # Uncomment the following if use ceph or other file clients.
@@ -110,11 +115,7 @@ data = dict(
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        timestamps=[
-            "20220825",
-            "20220922",
-            "20220930",
-        ],
+        timestamps=["train"],
         data_root=data_root,
         pipeline=train_pipeline,
         classes=class_names,
@@ -123,33 +124,32 @@ data = dict(
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
         box_type_3d="LiDAR",
-        # with_unknown_boxes=True,
+        with_unknown_boxes=False,
+        with_hard_boxes=True,
     ),
     val=dict(
         type=dataset_type,
-        timestamps=[
-            "20220921",
-        ],
+        timestamps=["20221024", "20221026"],
         data_root=data_root,
         pipeline=test_pipeline,
         classes=class_names,
         modality=input_modality,
         test_mode=True,
         box_type_3d="LiDAR",
-        # with_unknown_boxes=True,
+        with_unknown_boxes=False,
+        with_hard_boxes=True,
     ),
     test=dict(
         type=dataset_type,
-        timestamps=[
-            "20220921",
-        ],
+        timestamps=["20221024", "20221026"],
         data_root=data_root,
         pipeline=test_pipeline,
         classes=class_names,
         modality=input_modality,
         test_mode=True,
         box_type_3d="LiDAR",
-        # with_unknown_boxes=True,
+        with_unknown_boxes=False,
+        with_hard_boxes=True,
     ),
 )
 # For nuScenes dataset, we usually evaluate the model at the end of training.

@@ -6,10 +6,10 @@ from glob import glob
 from tqdm import tqdm
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data-dir", default="data/xdq/source/20220825")
+parser.add_argument("--data-dir", default="data/xdq/data/20220825")
 args = parser.parse_args()
 
-for pcd_file in tqdm(glob(osp.join(args.root_dir, "*/*.pcd"))):
+for pcd_file in tqdm(glob(osp.join(args.data_dir, "*/*.pcd"))):
     np_file = pcd_file.replace("pcd", "npy")
     pc = pypcd.PointCloud.from_path(pcd_file)
     np.save(
