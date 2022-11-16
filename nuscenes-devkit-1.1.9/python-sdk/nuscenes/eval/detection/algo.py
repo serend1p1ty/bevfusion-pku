@@ -23,6 +23,7 @@ def accumulate(
     class_name: str,
     dist_fcn: Callable,
     dist_th: float,
+    conf_th: float = 0.3,
     verbose: bool = False,
 ) -> DetectionMetricData:
     """
@@ -51,7 +52,7 @@ def accumulate(
 
     # For missing classes in the GT, return a data structure corresponding to no predictions.
     if npos == 0:
-        return DetectionMetricData.no_predictions()
+        return DetectionMetricData.no_predictions(), 0, 0
 
     # Organize the predictions in a single list.
     pred_boxes_list = [box for box in pred_boxes.all if box.detection_name == class_name]
@@ -134,7 +135,7 @@ def accumulate(
 
     # Check if we have any matches. If not, just return a "no predictions" array.
     if len(match_data["trans_err"]) == 0:
-        return DetectionMetricData.no_predictions()
+        return DetectionMetricData.no_predictions(), 0, 0
 
     # ---------------------------------------------
     # Calculate and interpolate precision and recall
@@ -149,10 +150,20 @@ def accumulate(
     prec = tp / (fp + tp)
     rec = tp / float(npos)
 
+    prec_copy = prec.copy()
+    rec_copy = rec.copy()
+    conf_copy = conf.copy()
+
     rec_interp = np.linspace(0, 1, DetectionMetricData.nelem)  # 101 steps, from 0% to 100% recall.
     prec = np.interp(rec_interp, rec, prec, right=0)
     conf = np.interp(rec_interp, rec, conf, right=0)
     rec = rec_interp
+
+    conf_interp = np.linspace(0, 1, DetectionMetricData.nelem)
+    prec_conf = np.interp(conf_interp, conf_copy[::-1], prec_copy[::-1], right=1)
+    rec_conf = np.interp(conf_interp, conf_copy[::-1], rec_copy[::-1], right=0)
+    idx = np.where(conf_interp == conf_th)[0]
+    ret_p, ret_r = float(prec_conf[idx]), float(rec_conf[idx])
 
     # ---------------------------------------------
     # Re-sample the match-data to match, prec, recall and conf.
@@ -172,16 +183,131 @@ def accumulate(
     # ---------------------------------------------
     # Done. Instantiate MetricData and return
     # ---------------------------------------------
-    return DetectionMetricData(
-        recall=rec,
-        precision=prec,
-        confidence=conf,
-        trans_err=match_data["trans_err"],
-        vel_err=match_data["vel_err"],
-        scale_err=match_data["scale_err"],
-        orient_err=match_data["orient_err"],
-        attr_err=match_data["attr_err"],
+    return (
+        DetectionMetricData(
+            recall=rec,
+            precision=prec,
+            confidence=conf,
+            trans_err=match_data["trans_err"],
+            vel_err=match_data["vel_err"],
+            scale_err=match_data["scale_err"],
+            orient_err=match_data["orient_err"],
+            attr_err=match_data["attr_err"],
+        ),
+        ret_p,
+        ret_r,
     )
+
+
+def accumulate_by_sample(
+    gt_boxes: EvalBoxes,
+    pred_boxes: EvalBoxes,
+    sample_token: str,
+    dist_fcn: Callable,
+    dist_th: float,
+    conf_th: float = 0.3,
+    verbose: bool = False,
+) -> DetectionMetricData:
+    # Count the positives.
+    npos = len([1 for gt_box in gt_boxes.all if gt_box.sample_token == sample_token])
+    if verbose:
+        print(
+            "Found {} GT of sample {} out of {} total across {} samples.".format(
+                npos, sample_token, len(gt_boxes.all), len(gt_boxes.sample_tokens)
+            )
+        )
+
+    # For missing classes in the GT, return a data structure corresponding to no predictions.
+    if npos == 0:
+        return 0, 0, 0
+
+    # Organize the predictions in a single list.
+    pred_boxes_list = [box for box in pred_boxes.all if box.sample_token == sample_token]
+    pred_confs = [box.detection_score for box in pred_boxes_list]
+
+    if verbose:
+        print(
+            "Found {} PRED of sample {} out of {} total across {} samples.".format(
+                len(pred_confs), sample_token, len(pred_boxes.all), len(pred_boxes.sample_tokens)
+            )
+        )
+
+    # Sort by confidence.
+    sortind = [i for (v, i) in sorted((v, i) for (i, v) in enumerate(pred_confs))][::-1]
+
+    # Do the actual matching.
+    tp = []  # Accumulator of true positives.
+    fp = []  # Accumulator of false positives.
+    conf = []  # Accumulator of confidences.
+
+    # ---------------------------------------------
+    # Match and accumulate match data.
+    # ---------------------------------------------
+
+    taken = set()  # Initially no gt bounding box is matched.
+    has_any_match = False
+    for ind in sortind:
+        pred_box = pred_boxes_list[ind]
+        min_dist = np.inf
+        match_gt_idx = None
+
+        for gt_idx, gt_box in enumerate(gt_boxes[pred_box.sample_token]):
+            # Find closest match among ground truth boxes
+            if not (pred_box.sample_token, gt_idx) in taken:
+                this_distance = dist_fcn(gt_box, pred_box)
+                if this_distance < min_dist:
+                    min_dist = this_distance
+                    match_gt_idx = gt_idx
+
+        # If the closest match is close enough according to threshold we have a match!
+        is_match = min_dist < dist_th
+
+        if is_match:
+            has_any_match = True
+            taken.add((pred_box.sample_token, match_gt_idx))
+
+            # Update tp, fp and confs.
+            tp.append(1)
+            fp.append(0)
+            conf.append(pred_box.detection_score)
+        else:
+            # No match. Mark this as a false positive.
+            tp.append(0)
+            fp.append(1)
+            conf.append(pred_box.detection_score)
+
+    # Check if we have any matches. If not, just return a "no predictions" array.
+    if not has_any_match:
+        return 0, 0, 0
+
+    # ---------------------------------------------
+    # Calculate and interpolate precision and recall
+    # ---------------------------------------------
+
+    # Accumulate.
+    tp = np.cumsum(tp).astype(float)
+    fp = np.cumsum(fp).astype(float)
+    conf = np.array(conf)
+
+    # Calculate precision and recall.
+    prec = tp / (fp + tp)
+    rec = tp / float(npos)
+
+    if conf_th > conf[0]:
+        idx = 0
+    elif conf_th < conf[-1]:
+        idx = len(conf) - 1
+    else:
+        for idx, cf in enumerate(conf):
+            if cf <= conf_th:
+                break
+        if conf[idx] != conf_th:
+            idx -= 1
+    p, r = prec[idx], rec[idx]
+    if abs(p + r) < 1e-5:
+        return 0, 0, 0
+    else:
+        return 2 * p * r / (p + r), p, r
 
 
 def calc_ap(md: DetectionMetricData, min_recall: float, min_precision: float) -> float:

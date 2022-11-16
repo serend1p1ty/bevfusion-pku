@@ -18,6 +18,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="MMDet visualize a model")
     parser.add_argument("config", help="test config file path")
     parser.add_argument("--mode", type=str, default="gt", choices=["gt", "pred"])
+    parser.add_argument("--only-bad-cases", action="store_true")
     parser.add_argument("--checkpoint", help="checkpoint file")
     parser.add_argument("--split", type=str, default="test", choices=["train", "val", "test"])
     parser.add_argument("--bbox-classes", nargs="+", type=int, default=None)
@@ -48,7 +49,12 @@ def main():
         init_dist(args.launcher, **cfg.dist_params)
 
     # build the dataloader
-    dataset = build_dataset(cfg.data[args.split])
+    if not args.only_bad_cases:
+        dataset = build_dataset(cfg.data[args.split])
+    else:
+        bad_cases = np.load("bad_cases.npy", allow_pickle=True)
+        bad_cases = [b[3] for b in bad_cases.tolist()]
+        dataset = build_dataset(cfg.data[args.split], default_args=dict(only_bad_cases=bad_cases))
     data_loader = build_dataloader(
         dataset,
         samples_per_gpu=1,

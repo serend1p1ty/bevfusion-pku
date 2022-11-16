@@ -19,7 +19,7 @@ from nuscenes.eval.common.loaders import (
     add_center_dist,
     filter_eval_boxes,
 )
-from nuscenes.eval.detection.algo import accumulate, calc_ap, calc_tp
+from nuscenes.eval.detection.algo import accumulate, accumulate_by_sample, calc_ap, calc_tp
 from nuscenes.eval.detection.constants import TP_METRICS
 from nuscenes.eval.detection.data_classes import (
     DetectionConfig,
@@ -122,7 +122,9 @@ class DetectionEval:
 
         self.sample_tokens = self.gt_boxes.sample_tokens
 
-    def evaluate(self) -> Tuple[DetectionMetrics, DetectionMetricDataList]:
+    def evaluate(
+        self, conf_th=0.3, return_bad_cases=False
+    ) -> Tuple[DetectionMetrics, DetectionMetricDataList]:
         """
         Performs the actual evaluation.
         :return: A tuple of high-level and the raw metric data.
@@ -137,10 +139,36 @@ class DetectionEval:
         metric_data_list = DetectionMetricDataList()
         for class_name in self.cfg.class_names:
             for dist_th in self.cfg.dist_ths:
-                md = accumulate(
-                    self.gt_boxes, self.pred_boxes, class_name, self.cfg.dist_fcn_callable, dist_th
+                md, p, r = accumulate(
+                    self.gt_boxes,
+                    self.pred_boxes,
+                    class_name,
+                    self.cfg.dist_fcn_callable,
+                    dist_th,
+                    conf_th,
                 )
                 metric_data_list.set(class_name, dist_th, md)
+                if self.verbose:
+                    print(
+                        f"Dist thresh: {dist_th}, Conf thresh: {conf_th}, "
+                        f"Class: {class_name}, Precision: {p}, Recall: {r}"
+                    )
+
+        bad_cases = []
+        if return_bad_cases:
+            f1_res = []
+            for sample_token in self.sample_tokens:
+                f1, p, r = accumulate_by_sample(
+                    self.gt_boxes,
+                    self.pred_boxes,
+                    sample_token,
+                    self.cfg.dist_fcn_callable,
+                    dist_th=2.0,
+                    conf_th=conf_th,
+                )
+                f1_res.append((f1, p, r, sample_token))
+            # return the worst 30 samples
+            bad_cases = sorted(f1_res)[:30]
 
         # -----------------------------------
         # Step 2: Calculate metrics from the data.
@@ -173,7 +201,7 @@ class DetectionEval:
         # Compute evaluation time.
         metrics.add_runtime(time.time() - start_time)
 
-        return metrics, metric_data_list
+        return metrics, metric_data_list, bad_cases
 
     def render(self, metrics: DetectionMetrics, md_list: DetectionMetricDataList) -> None:
         """
@@ -225,7 +253,13 @@ class DetectionEval:
                 savepath=savepath("dist_pr_" + str(dist_th)),
             )
 
-    def main(self, plot_examples: int = 0, render_curves: bool = True) -> Dict[str, Any]:
+    def main(
+        self,
+        plot_examples: int = 0,
+        render_curves: bool = True,
+        conf_th: float = 0.3,
+        return_bad_cases: bool = False,
+    ) -> Dict[str, Any]:
         """
         Main function that loads the evaluation code, visualizes samples, runs the evaluation and renders stat plots.
         :param plot_examples: How many example visualizations to write to disk.
@@ -255,7 +289,9 @@ class DetectionEval:
                 )
 
         # Run evaluation.
-        metrics, metric_data_list = self.evaluate()
+        metrics, metric_data_list, bad_cases = self.evaluate(
+            conf_th=conf_th, return_bad_cases=return_bad_cases
+        )
 
         # Render PR and TP curves.
         if render_curves:
@@ -305,7 +341,7 @@ class DetectionEval:
                 )
             )
 
-        return metrics_summary
+        return metrics_summary, bad_cases
 
 
 class NuScenesEval(DetectionEval):

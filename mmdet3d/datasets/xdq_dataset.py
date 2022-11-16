@@ -213,12 +213,14 @@ class XdqDataset(Custom3DDataset):
         filter_empty_gt=True,
         test_mode=False,
         eval_version="detection_cvpr_2019",
+        only_bad_cases=None,
     ):
         self.timestamps = timestamps
         self.data_dir = osp.join(data_root, "data")
         self.anno_dir = osp.join(data_root, "annotation")
         self.with_unknown_boxes = with_unknown_boxes
         self.with_hard_boxes = with_hard_boxes
+        self.only_bad_cases = only_bad_cases
 
         if modality is None:
             modality = dict(
@@ -364,6 +366,9 @@ class XdqDataset(Custom3DDataset):
 
                 data_info["token"] = pcd_path.replace("/", "_")
                 data_info["lidar_path"] = pcd_path
+                if self.only_bad_cases is not None:
+                    if data_info["token"] not in self.only_bad_cases:
+                        continue
                 data_infos.append(data_info)
         return data_infos
 
@@ -390,7 +395,13 @@ class XdqDataset(Custom3DDataset):
             show_result(points, gt_bboxes, pred_bboxes, out_dir, file_name)
 
     def evaluate(
-        self, results, jsonfile_prefix=None, result_names=["pts_bbox"], show=False, out_dir=None
+        self,
+        results,
+        jsonfile_prefix=None,
+        result_names=["pts_bbox"],
+        show=False,
+        out_dir=None,
+        save_bad_cases=False,
     ):
         """Evaluation in nuScenes protocol.
 
@@ -413,10 +424,10 @@ class XdqDataset(Custom3DDataset):
             results_dict = dict()
             for name in result_names:
                 print("Evaluating bboxes of {}".format(name))
-                ret_dict = self._evaluate_single(result_files[name])
+                ret_dict = self._evaluate_single(result_files[name], save_bad_cases)
             results_dict.update(ret_dict)
         elif isinstance(result_files, str):
-            results_dict = self._evaluate_single(result_files)
+            results_dict = self._evaluate_single(result_files, save_bad_cases)
 
         if tmp_dir is not None:
             tmp_dir.cleanup()
@@ -433,7 +444,7 @@ class XdqDataset(Custom3DDataset):
                 )
         return results_dict
 
-    def _evaluate_single(self, result_path):
+    def _evaluate_single(self, result_path, save_bad_cases=False):
         """Evaluation for a single model in nuScenes protocol.
 
         Args:
@@ -457,7 +468,15 @@ class XdqDataset(Custom3DDataset):
             output_dir=output_dir,
             verbose=True,
         )
-        nusc_eval.main(render_curves=False)
+        _, bad_cases = nusc_eval.main(
+            render_curves=False, conf_th=0.3, return_bad_cases=save_bad_cases
+        )
+        if save_bad_cases:
+            print("#" * 10 + " Bad Cases " + "#" * 10)
+            for bad_case in bad_cases:
+                print(bad_case)
+            print("#" * 20)
+            np.save("bad_cases.npy", bad_cases)
 
         # record metrics
         metrics = mmcv.load(osp.join(output_dir, "metrics_summary.json"))

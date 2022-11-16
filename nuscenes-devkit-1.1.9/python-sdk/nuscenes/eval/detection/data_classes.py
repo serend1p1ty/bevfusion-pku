@@ -232,13 +232,21 @@ class DetectionMetrics:
         self.eval_time = eval_time
 
     @property
+    def eval_classes(self):
+        classes = []
+        for class_name, d in self._label_aps.items():
+            if class_name in ["car", "truck", "pedestrian", "bicycle"] and max(d.values()) > 0.1:
+                classes.append(class_name)
+        return classes
+
+    @property
     def mean_dist_aps(self) -> Dict[str, float]:
         """Calculates the mean over distance thresholds for each label."""
         #### modified ####
         return {
             class_name: np.mean(list(d.values()))
             for class_name, d in self._label_aps.items()
-            if class_name in ["car", "truck", "pedestrian", "bicycle"]
+            if class_name in self.eval_classes
         }
 
     @property
@@ -254,7 +262,7 @@ class DetectionMetrics:
             class_errors = []
             for detection_name in self.cfg.class_names:
                 #### modified ####
-                if detection_name not in ["car", "truck", "pedestrian", "bicycle"]:
+                if detection_name not in self.eval_classes:
                     continue
                 class_errors.append(self.get_label_tp(detection_name, metric_name))
 
