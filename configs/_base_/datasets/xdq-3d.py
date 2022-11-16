@@ -125,11 +125,11 @@ data = dict(
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
-        with_hard_boxes=False,
+        with_hard_boxes=True,
     ),
     val=dict(
         type=dataset_type,
-        timestamps=["20221024", "20221026"],
+        timestamps=["test"],
         data_root=data_root,
         pipeline=test_pipeline,
         classes=class_names,
@@ -137,11 +137,11 @@ data = dict(
         test_mode=True,
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
-        with_hard_boxes=False,
+        with_hard_boxes=True,
     ),
     test=dict(
         type=dataset_type,
-        timestamps=["20221024", "20221026"],
+        timestamps=["test"],
         data_root=data_root,
         pipeline=test_pipeline,
         classes=class_names,
@@ -149,7 +149,7 @@ data = dict(
         test_mode=True,
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
-        with_hard_boxes=False,
+        with_hard_boxes=True,
     ),
 )
 # For nuScenes dataset, we usually evaluate the model at the end of training.

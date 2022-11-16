@@ -12,7 +12,7 @@ from mmdet3d.datasets.xdq_dataset import mapper
 def get_all_files(data_dir):
     all_files = []
     for file_path in glob(os.path.join(data_dir, "*/*/*_norm.json")):
-        if "20220720" in file_path or "test_100-150m" in file_path or "train" in file_path:
+        if "20220720" in file_path or "test" in file_path or "train" in file_path:
             continue
         all_files.append(file_path)
     print(f"Num of total files: {len(all_files)}")
@@ -90,10 +90,20 @@ def plot_hard_bbox(data_dir):
     plt.savefig("hard_bboxes.png")
 
 
+def print_nid_samplenum(data_dir):
+    nid2samplenum = defaultdict(int)
+    for file_path in tqdm(get_all_files(data_dir)):
+        anno = json.load(open(file_path))
+        nid = anno["nid"]
+        nid2samplenum[nid] += 1
+    print(nid2samplenum)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", default="data/xdq")
     parser.add_argument("--print-bbox-range", action="store_true")
+    parser.add_argument("--print-nid-samplenum", action="store_true")
     parser.add_argument("--plot-bbox-center", action="store_true")
     parser.add_argument("--plot-unknown-bbox", action="store_true")
     parser.add_argument("--plot-hard-bbox", action="store_true")
@@ -101,6 +111,10 @@ if __name__ == "__main__":
 
     if args.print_bbox_range:
         print_bbox_range(args.data_dir)
+        exit(0)
+
+    if args.print_nid_samplenum:
+        print_nid_samplenum(args.data_dir)
         exit(0)
 
     if args.plot_bbox_center:
