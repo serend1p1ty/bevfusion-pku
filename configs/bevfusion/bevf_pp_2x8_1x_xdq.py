@@ -14,22 +14,26 @@ model = dict(
     se=True,
     lc_fusion=True,
     camera_stream=True,
+    #### modified ####
     norm_offsets={
-        "2": [-29.47, 32.36, 45.5],
-        "3": [-14.57, 73.2, 45.24],
-        "12": [181.5, -80.63, 45.93],
-        "21": [13.57, 73.88, 45.45],
-        "32": [56.18, 5.57, 45.58],
-        "33": [-57.96, -7.58, 45.62],
-        "34": [-6.65, -23.98, 45.46],
-        "35": [63.9, 51.86, 45.73],
+        "1": [22, -70, 45.75],
+        "2": [-23.32, 35.89, 45.75],
+        "3": [-25, 98, 45.34],
+        "7": [-65, -31, 45.19],
+        "12": [290, -120, 45.99],
+        "16": [-50, 62, 46.91],
+        "17": [8, -8, 45.41],
+        "19": [39, -68, 46.21],
+        "21": [19, 73, 45.6],
+        "32": [55, 12, 45.93],
+        "33": [-75, 1, 45.97],
+        "34": [-9, -5, 45.71],
+        "35": [55, 55, 46.03],
     },
-    #### modified ####
-    camera_depth_range=[22.0, 90.0, 1.0],
-    #### modified ####
+    camera_depth_range=[20.0, 90.0, 1.0],
     pc_range=[-160, -160, -6, 160, 160, 4],
-    #### modified ####
     grid=0.8,
+    ##################
     num_views=6,
     final_dim=final_dim,
     downsample=downsample,
@@ -189,7 +193,7 @@ optimizer = dict(
 
 load_lift_from = "work_dirs/pre_bevf_pp_4x8_2x_nusc_cam/epoch_24.pth"  #####load cam stream
 load_from = (
-    "work_dirs/hv_pointpillars_secfpn_sbn-all_4x8_2x_xdq-3d/epoch_24.pth"  #####load lidar stream
+    "work_dirs/hv_pointpillars_secfpn_sbn-all_4x8_2x_xdq-3d-v3/epoch_24.pth"  #####load lidar stream
 )
 model_parallelism = True
 #### modified ####
@@ -198,3 +202,4 @@ lr_config = dict(
     policy="step", warmup="linear", warmup_iters=1000, warmup_ratio=1.0 / 1000, step=[6, 8]
 )
 total_epochs = 9
+##################

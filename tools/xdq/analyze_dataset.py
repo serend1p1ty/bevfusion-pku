@@ -141,7 +141,7 @@ def create_frustum():
     # make grid in image plane
     ogfH, ogfW = (1080, 1920)
     fH, fW = ogfH // 8, ogfW // 8
-    dbound = [22.0, 90.0, 1.0]
+    dbound = [20.0, 90.0, 1.0]
     ds = torch.arange(*dbound, dtype=torch.float).view(-1, 1, 1).expand(-1, fH, fW)
     D, _, _ = ds.shape
     xs = torch.linspace(0, ogfW - 1, fW, dtype=torch.float).view(1, 1, fW).expand(D, fH, fW)

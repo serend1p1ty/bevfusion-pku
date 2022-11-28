@@ -286,14 +286,14 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
             )
             losses.update(losses_pts)
         if img_feats:
-            # losses_img = self.forward_img_train(
-            #     img_feats,
-            #     img_metas=img_metas,
-            #     gt_bboxes=gt_bboxes,
-            #     gt_labels=gt_labels,
-            #     gt_bboxes_ignore=gt_bboxes_ignore,
-            #     proposals=proposals,
-            # )
+            losses_img = self.forward_img_train(
+                img_feats,
+                img_metas=img_metas,
+                gt_bboxes=gt_bboxes,
+                gt_labels=gt_labels,
+                gt_bboxes_ignore=gt_bboxes_ignore,
+                proposals=proposals,
+            )
             if img_depth is not None:
                 # depth_dist: [2, 6, 41, 112, 200]
                 # img_depth (gt): [2, 6, 112, 200, 42]
@@ -304,7 +304,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                     * self.img_depth_loss_weight
                 )
                 losses.update(img_depth_loss=loss_depth)
-            # losses.update(losses_img)
+            losses.update(losses_img)
         return losses
 
     def depth_dist_loss(self, predict_depth_dists, gt_depths, loss_method="kld", img=None):

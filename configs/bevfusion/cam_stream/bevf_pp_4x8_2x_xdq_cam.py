@@ -1,55 +1,55 @@
 _base_ = [
-    "../_base_/datasets/nusc_pp.py",
-    "../_base_/schedules/schedule_1x.py",
-    "../_base_/default_runtime.py",
+    "../../_base_/datasets/xdq_cam_pp.py",
+    "../../_base_/schedules/schedule_2x.py",
+    "../../_base_/default_runtime.py",
 ]
-final_dim = (900, 1600)  # HxW
+optimizer = dict(
+    _delete_=True,
+    type="AdamW",
+    lr=0.001,
+    betas=(0.9, 0.999),
+    weight_decay=0.05,
+    paramwise_cfg=dict(
+        custom_keys={
+            "absolute_pos_embed": dict(decay_mult=0.0),
+            "relative_position_bias_table": dict(decay_mult=0.0),
+            "norm": dict(decay_mult=0.0),
+        }
+    ),
+)
+
+#### modified ####
+final_dim = (1080, 1920)  # HxW
 downsample = 8
-voxel_size = [0.25, 0.25, 8]
-imc = 256
+#### modified ####
+voxel_size = [0.4, 0.4, 10]
 model = dict(
     type="BEVF_FasterRCNN",
-    se=True,
-    lc_fusion=True,
     camera_stream=True,
-    grid=0.5,
+    lss=False,
+    #### modified ####
+    norm_offsets={
+        "1": [22, -70, 45.75],
+        "2": [-23.32, 35.89, 45.75],
+        "3": [-25, 98, 45.34],
+        "7": [-65, -31, 45.19],
+        "12": [290, -120, 45.99],
+        "16": [-50, 62, 46.91],
+        "17": [8, -8, 45.41],
+        "19": [39, -68, 46.21],
+        "21": [19, 73, 45.6],
+        "32": [55, 12, 45.93],
+        "33": [-75, 1, 45.97],
+        "34": [-9, -5, 45.71],
+        "35": [55, 55, 46.03],
+    },
+    camera_depth_range=[20.0, 90.0, 1.0],
+    pc_range=[-160, -160, -6, 160, 160, 4],
+    grid=0.8,
+    ##################
     num_views=6,
     final_dim=final_dim,
     downsample=downsample,
-    imc=imc,
-    pts_voxel_layer=dict(
-        max_num_points=64,
-        point_cloud_range=[-50, -50, -5, 50, 50, 3],
-        voxel_size=voxel_size,
-        max_voxels=(30000, 40000),
-    ),
-    pts_voxel_encoder=dict(
-        type="HardVFE",
-        in_channels=4,
-        feat_channels=[64, 64],
-        with_distance=False,
-        voxel_size=voxel_size,
-        with_cluster_center=True,
-        with_voxel_center=True,
-        point_cloud_range=[-50, -50, -5, 50, 50, 3],
-        norm_cfg=dict(type="naiveSyncBN1d", eps=1e-3, momentum=0.01),
-    ),
-    pts_middle_encoder=dict(type="PointPillarsScatter", in_channels=64, output_shape=[400, 400]),
-    pts_backbone=dict(
-        type="SECOND",
-        in_channels=64,
-        norm_cfg=dict(type="naiveSyncBN2d", eps=1e-3, momentum=0.01),
-        layer_nums=[3, 5, 5],
-        layer_strides=[2, 2, 2],
-        out_channels=[64, 128, 256],
-    ),
-    pts_neck=dict(
-        type="SECONDFPN",
-        norm_cfg=dict(type="naiveSyncBN2d", eps=1e-3, momentum=0.01),
-        in_channels=[64, 128, 256],
-        upsample_strides=[1, 2, 4],
-        out_channels=[128, 128, 128],
-    ),
     img_backbone=dict(
         type="CBSwinTransformer",
         embed_dim=96,
@@ -73,26 +73,26 @@ model = dict(
         downsample=downsample,
         in_channels=[96, 192, 384, 768],
         out_channels=256,
-        outC=imc,
         use_adp=True,
         num_outs=5,
     ),
     pts_bbox_head=dict(
         type="Anchor3DHead",
         num_classes=10,
-        in_channels=384,
-        feat_channels=384,
+        in_channels=256,
+        feat_channels=256,
         use_direction_classifier=True,
         anchor_generator=dict(
             type="AlignedAnchor3DRangeGenerator",
+            #### modified ####
             ranges=[
-                [-49.6, -49.6, -1.80032795, 49.6, 49.6, -1.80032795],
-                [-49.6, -49.6, -1.74440365, 49.6, 49.6, -1.74440365],
-                [-49.6, -49.6, -1.68526504, 49.6, 49.6, -1.68526504],
-                [-49.6, -49.6, -1.67339111, 49.6, 49.6, -1.67339111],
-                [-49.6, -49.6, -1.61785072, 49.6, 49.6, -1.61785072],
-                [-49.6, -49.6, -1.80984986, 49.6, 49.6, -1.80984986],
-                [-49.6, -49.6, -1.763965, 49.6, 49.6, -1.763965],
+                [-160, -160, -1.80032795, 160, 160, -1.80032795],
+                [-160, -160, -1.74440365, 160, 160, -1.74440365],
+                [-160, -160, -1.68526504, 160, 160, -1.68526504],
+                [-160, -160, -1.67339111, 160, 160, -1.67339111],
+                [-160, -160, -1.61785072, 160, 160, -1.61785072],
+                [-160, -160, -1.80984986, 160, 160, -1.80984986],
+                [-160, -160, -1.763965, 160, 160, -1.763965],
             ],
             sizes=[
                 [1.95017717, 4.60718145, 1.72270761],  # car
@@ -148,26 +148,10 @@ model = dict(
 
 
 data = dict(
-    samples_per_gpu=2,
-    workers_per_gpu=6,
+    samples_per_gpu=1,
+    workers_per_gpu=1,
 )
 
-optimizer = dict(
-    type="AdamW",
-    lr=0.001,
-    betas=(0.9, 0.999),
-    weight_decay=0.05,
-    paramwise_cfg=dict(
-        custom_keys={
-            "absolute_pos_embed": dict(decay_mult=0.0),
-            "relative_position_bias_table": dict(decay_mult=0.0),
-            "norm": dict(decay_mult=0.0),
-        }
-    ),
-)
-
-load_lift_from = "work_dirs/pre_bevf_pp_4x8_2x_nusc_cam/epoch_24.pth"  #####load cam stream
-load_from = (
-    "work_dirs/pre_hv_pointpillars_secfpn_sbn-all_4x8_2x_nus-3d/epoch_24.pth"  #####load lidar stream
-)
-model_parallelism = True
+load_img_from = "work_dirs/pre_mask_rcnn_dbswin-t_fpn_3x_nuim_cocopre/epoch_36.pth"
+#### modified ####
+fp16 = dict(loss_scale=32.0)

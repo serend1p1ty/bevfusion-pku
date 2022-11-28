@@ -1,24 +1,5 @@
 #### modified ####
-point_cloud_range = [-160.0, -160.0, -6.0, 160.0, 160.0, 4.0]
-#### modified ####
-# XDQ point cloud has been normalized offline, and stored in disk (*_norm.npy)
-# The variable is used to normalize image LSS point cloud online and
-# unnormalize prediction result.
-norm_offsets = {
-    "1": [22, -70, 45.75],
-    "2": [-23.32, 35.89, 45.75],
-    "3": [-25, 98, 45.34],
-    "7": [-65, -31, 45.19],
-    "12": [290, -120, 45.99],
-    "16": [-50, 62, 46.91],
-    "17": [8, -8, 45.41],
-    "19": [39, -68, 46.21],
-    "21": [19, 73, 45.6],
-    "32": [55, 12, 45.93],
-    "33": [-75, 1, 45.97],
-    "34": [-9, -5, 45.71],
-    "35": [55, 55, 46.03],
-}
+point_cloud_range = [-160, -160, -6, 160, 160, 4]
 class_names = [
     "car",
     "truck",
@@ -31,7 +12,7 @@ class_names = [
     "traffic_cone",
     "barrier",
 ]
-evaluation = dict(interval=24)
+evaluation = dict(interval=36)
 
 dataset_type = "XdqDataset"
 data_root = "data/xdq/"
@@ -55,12 +36,7 @@ train_pipeline = [
         sweeps_num=sweeps_num,
     ),
     dict(type="LoadAnnotations3D", with_bbox_3d=True, with_label_3d=True),
-    dict(
-        type="LoadMultiViewImageFromFiles",
-        project_pts_to_img_depth=True,
-        cam_depth_range=[20.0, 90.0, 1.0],
-        norm_offsets=norm_offsets,
-    ),
+    dict(type="LoadMultiViewImageFromFiles"),
     dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
     dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),
     dict(type="ObjectNameFilter", classes=class_names),
@@ -69,7 +45,7 @@ train_pipeline = [
     dict(type="MyNormalize", **img_norm_cfg),
     dict(type="MyPad", size_divisor=32),
     dict(type="DefaultFormatBundle3D", class_names=class_names),
-    dict(type="Collect3D", keys=["points", "img", "img_depth", "gt_bboxes_3d", "gt_labels_3d"]),
+    dict(type="Collect3D", keys=["points", "img", "gt_bboxes_3d", "gt_labels_3d"]),
 ]
 test_pipeline = [
     dict(

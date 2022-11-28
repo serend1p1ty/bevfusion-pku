@@ -7,19 +7,19 @@ point_cloud_range = [-160.0, -160.0, -6.0, 160.0, 160.0, 4.0]
 # The variable is used to normalize image LSS point cloud online and
 # unnormalize prediction result.
 norm_offsets = {
-    "1": [-4.46, -34.1, 45.75],
+    "1": [22, -70, 45.75],
     "2": [-23.32, 35.89, 45.75],
-    "3": [-4.64, 71.39, 45.34],
-    "7": [-17.48, -19.43, 45.19],
-    "12": [184.74, -78.32, 45.99],
-    "16": [33.16, 83.63, 46.91],
-    "17": [-18.74, -35.58, 45.41],
-    "19": [-12.4, -52.47, 46.21],
-    "21": [12.77, 71.73, 45.6],
-    "32": [48.12, -0.02, 45.93],
-    "33": [-53.45, -6.59, 45.97],
-    "34": [-8.23, -31.04, 45.71],
-    "35": [63.23, 49.72, 46.03],
+    "3": [-25, 98, 45.34],
+    "7": [-65, -31, 45.19],
+    "12": [290, -120, 45.99],
+    "16": [-50, 62, 46.91],
+    "17": [8, -8, 45.41],
+    "19": [39, -68, 46.21],
+    "21": [19, 73, 45.6],
+    "32": [55, 12, 45.93],
+    "33": [-75, 1, 45.97],
+    "34": [-9, -5, 45.71],
+    "35": [55, 55, 46.03],
 }
 # For nuScenes we usually do 10-class detection
 class_names = [
@@ -87,6 +87,7 @@ test_pipeline = [
         use_dim=5,
         file_client_args=file_client_args,
     ),
+    # dict(type="SplitBEVLiDAR"),
     dict(
         type="LoadPointsFromMultiSweeps", sweeps_num=sweeps_num, file_client_args=file_client_args
     ),
@@ -115,7 +116,16 @@ data = dict(
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        timestamps=["train"],
+        timestamps=[
+            "20220825",
+            "20220921#2",
+            "20220922",
+            "20220930#3/12/32",
+            "20221016",
+            "20221018#1/16/19/21",
+            "20221024#3/7",
+            "20221026",
+        ],
         data_root=data_root,
         pipeline=train_pipeline,
         classes=class_names,
@@ -125,11 +135,42 @@ data = dict(
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
-        with_hard_boxes=True,
+        with_hard_boxes=False,
     ),
+    # train=dict(
+    #     type="CBGSDataset",
+    #     dataset=dict(
+    #         type=dataset_type,
+    #         timestamps=[
+    #             "20220825",
+    #             "20220921",
+    #             "20220922",
+    #             "20220930#3/12/32",
+    #             "20221016",
+    #             "20221018#1/16/19",
+    #             "20221024#3/7",
+    #             "20221026",
+    #         ],
+    #         data_root=data_root,
+    #         pipeline=train_pipeline,
+    #         classes=class_names,
+    #         modality=input_modality,
+    #         test_mode=False,
+    #         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
+    #         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
+    #         box_type_3d="LiDAR",
+    #         with_unknown_boxes=False,
+    #         with_hard_boxes=False,
+    #     ),
+    # ),
     val=dict(
         type=dataset_type,
-        timestamps=["test"],
+        timestamps=[
+            "20220921#21",
+            "20220930#34",
+            "20221018#2/3",
+            "20221024#19",
+        ],
         data_root=data_root,
         pipeline=test_pipeline,
         classes=class_names,
@@ -137,11 +178,16 @@ data = dict(
         test_mode=True,
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
-        with_hard_boxes=True,
+        with_hard_boxes=False,
     ),
     test=dict(
         type=dataset_type,
-        timestamps=["test"],
+        timestamps=[
+            "20220921#21",  # 755
+            "20220930#34",  # 229
+            "20221018#2/3",  # 388, 918
+            "20221024#19",  # 167
+        ],
         data_root=data_root,
         pipeline=test_pipeline,
         classes=class_names,
@@ -149,7 +195,7 @@ data = dict(
         test_mode=True,
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
-        with_hard_boxes=True,
+        with_hard_boxes=False,
     ),
 )
 # For nuScenes dataset, we usually evaluate the model at the end of training.

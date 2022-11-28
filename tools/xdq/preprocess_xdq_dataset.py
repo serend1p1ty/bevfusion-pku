@@ -7,6 +7,12 @@ from copy import deepcopy
 from glob import glob
 from tqdm import tqdm
 
+# Data process:
+# 1. Calculate norm offsets or hand-craft
+# 2. Normalize LiDAR points and annotation bboxes
+# 3. Check Camera-LiDAR mismatch
+# 4. Check cid-ImgURL mismatch
+
 # calculated by cal_xyz_offset(), used to normalize point cloud to origin-centered, z=-5 grounded
 # norm_offsets = {
 #     "1": [-4.46, -34.1, 45.75],
@@ -152,8 +158,12 @@ def fix_cam_lidar_mismatch(fix=False):
     mismatch_more = []
     # cam is less than lidar
     mismatch_less = []
+    # cid is incorrect
+    cid_err_files = []
     for anno_file in tqdm(anno_files):
         anno = json.load(open(anno_file))
+
+        # check cam-lidar mismatch
         pcd_relative_path = re.search(
             "[^/?]+/[^/?]+/[^/?]+npy", anno["pcd_path"].replace(".pcd", "_norm.npy")
         ).group()
@@ -168,13 +178,43 @@ def fix_cam_lidar_mismatch(fix=False):
         if cam_num < lidar_num:
             mismatch_num += 1
             mismatch_less.append(anno_file)
+
+        # check cid correctness
+        for cam_info in anno["cams"]:
+            cid = cam_info["cid"]
+            img_url = cam_info["img_path"]
+            res = re.search("[^/?]+/([^/?]+)/([^/?]+)-[^/?]+jpg", img_url)
+            img_path = os.path.join(args.dataset_dir, "data", res.group())
+            assert os.path.exists(img_path)
+            nid, kid = res.group(1), res.group(2)
+            assert int(nid) <= 35 and int(kid) <= 4
+            if cid != f"{nid}-{kid}":
+                cid_err_files.append(anno_file)
+                break
     print(f"Total mismatch_num: {mismatch_num}")
     print(f"##### {len(mismatch_more)} files, cam is more than LiDAR: {mismatch_more}")
     print(f"##### {len(mismatch_less)} files, cam is less than LiDAR: {mismatch_less}")
+    print(f"##### {len(cid_err_files)} files, cid is incorrect: {cid_err_files}")
 
     if fix:
         for anno_file in mismatch_less + mismatch_more:
             os.remove(anno_file)
+        for anno_file in cid_err_files:
+            anno = json.load(open(anno_file))
+            for i, cam_info in enumerate(anno["cams"]):
+                cid = cam_info["cid"]
+                img_url = cam_info["img_path"]
+                res = re.search("[^/?]+/([^/?]+)/([^/?]+)-[^/?]+jpg", img_url)
+                img_path = os.path.join(args.dataset_dir, "data", res.group())
+                assert os.path.exists(img_path)
+                nid, kid = res.group(1), res.group(2)
+                assert int(nid) <= 35 and int(kid) <= 4
+                correct_cid = f"{nid}-{kid}"
+                if cid != correct_cid:
+                    print(f"Fixed {cid} to {correct_cid}")
+                    anno["cams"][i]["cid"] = correct_cid
+            with open(anno_file, "w") as f:
+                json.dump(anno, f, indent=4)
 
 
 if __name__ == "__main__":
