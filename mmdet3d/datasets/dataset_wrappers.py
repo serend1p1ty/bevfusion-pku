@@ -40,12 +40,19 @@ class CBGSDataset(object):
             sample_cat_ids = self.dataset.get_cat_ids(idx)
             for cat_id in sample_cat_ids:
                 class_sample_idxs[cat_id].append(idx)
+        class_sample_idxs = {
+            cat_id: sample_idxs
+            for cat_id, sample_idxs in class_sample_idxs.items()
+            # pedestrian, car, truck, bicycle
+            if cat_id in [0, 1, 5, 7]
+        }
         duplicated_samples = sum([len(v) for _, v in class_sample_idxs.items()])
         class_distribution = {k: len(v) / duplicated_samples for k, v in class_sample_idxs.items()}
 
         sample_indices = []
 
-        frac = 1.0 / len(self.CLASSES)
+        # frac = 1.0 / len(self.CLASSES)
+        frac = 1.0 / 4
         ratios = [frac / v for v in class_distribution.values()]
         for cls_inds, ratio in zip(list(class_sample_idxs.values()), ratios):
             sample_indices += np.random.choice(cls_inds, int(len(cls_inds) * ratio)).tolist()

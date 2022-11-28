@@ -495,18 +495,24 @@ class Anchor3DHead(nn.Module, AnchorTrainMixin):
             mlvl_scores.append(scores)
             mlvl_dir_scores.append(dir_cls_score)
 
+        # [1000, 9]
         mlvl_bboxes = torch.cat(mlvl_bboxes)
+        # [1000, 5]
         mlvl_bboxes_for_nms = xywhr2xyxyr(
             input_meta["box_type_3d"](mlvl_bboxes, box_dim=self.box_code_size).bev
         )
+        # [1000, 10]
         mlvl_scores = torch.cat(mlvl_scores)
+        # [1000]
         mlvl_dir_scores = torch.cat(mlvl_dir_scores)
 
         if self.use_sigmoid_cls:
             # Add a dummy background class to the front when using sigmoid
             padding = mlvl_scores.new_zeros(mlvl_scores.shape[0], 1)
+            # [1000, 11]
             mlvl_scores = torch.cat([mlvl_scores, padding], dim=1)
 
+        # 0.05
         score_thr = cfg.get("score_thr", 0)
         results = box3d_multiclass_nms(
             mlvl_bboxes,

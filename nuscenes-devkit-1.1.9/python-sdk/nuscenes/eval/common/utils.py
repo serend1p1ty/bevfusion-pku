@@ -8,6 +8,7 @@ from pyquaternion import Quaternion
 
 from nuscenes.eval.common.data_classes import EvalBox
 from nuscenes.utils.data_classes import Box
+from mmdet3d.core import LiDARInstance3DBoxes
 
 DetectionBox = Any  # Workaround as direct imports lead to cyclic dependencies.
 
@@ -20,6 +21,22 @@ def center_distance(gt_box: EvalBox, pred_box: EvalBox) -> float:
     :return: L2 distance.
     """
     return np.linalg.norm(np.array(pred_box.translation[:2]) - np.array(gt_box.translation[:2]))
+
+
+def iou_distance(gt_box: EvalBox, pred_box: EvalBox) -> float:
+    """
+    IoU distance between the box centers (xy only).
+    :param gt_box: GT annotation sample.
+    :param pred_box: Predicted sample.
+    :return: L2 distance.
+    """
+    gt_box = LiDARInstance3DBoxes(
+        np.hstack((gt_box.translation, gt_box.size, gt_box.yaw))[None, :], box_dim=7
+    )
+    pred_box = LiDARInstance3DBoxes(
+        np.hstack((pred_box.translation, pred_box.size, pred_box.yaw))[None, :], box_dim=7
+    )
+    return 1 - gt_box.overlaps(gt_box, pred_box)
 
 
 def velocity_l2(gt_box: EvalBox, pred_box: EvalBox) -> float:

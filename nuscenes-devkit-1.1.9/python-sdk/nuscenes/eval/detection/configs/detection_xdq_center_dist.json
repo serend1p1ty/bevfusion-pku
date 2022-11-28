@@ -11,10 +11,6 @@
     "traffic_cone": 160,
     "barrier": 160
   },
-  "eval_dist_level": -1,
-  "eval_dist_interval": 50,
-  "eval_num_pts_level": -1,
-  "eval_num_pts_interval": 10,
   "dist_fcn": "center_distance",
   "dist_ths": [0.5, 1.0, 2.0, 4.0],
   "dist_th_tp": 2.0,

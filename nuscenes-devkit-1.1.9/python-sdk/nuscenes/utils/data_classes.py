@@ -571,6 +571,8 @@ class Box:
         label: int = np.nan,
         score: float = np.nan,
         velocity: Tuple = (np.nan, np.nan, np.nan),
+        num_pts: int = -1,
+        yaw: float = 0.0,
         name: str = None,
         token: str = None,
     ):
@@ -596,6 +598,8 @@ class Box:
         self.label = int(label) if not np.isnan(label) else label
         self.score = float(score) if not np.isnan(score) else score
         self.velocity = np.array(velocity)
+        self.num_pts = num_pts
+        self.yaw = yaw
         self.name = name
         self.token = token
 

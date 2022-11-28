@@ -82,6 +82,24 @@ def parse_args():
         "format will be kwargs for dataset.evaluate() function",
     )
     parser.add_argument(
+        "--save-bad-cases-num",
+        type=int,
+        default=0,
+        help="If > 0, save bad cases (bad_cases.npy) when evaluation.",
+    )
+    parser.add_argument(
+        "--conf-th",
+        type=float,
+        default=0.3,
+        help="The confidence threshold is used to filter predictions."
+    )
+    parser.add_argument(
+        "--dist-th",
+        type=float,
+        default=2.0,
+        help="The distance threshold is used to determine if one prediction is TP or FP."
+    )
+    parser.add_argument(
         "--launcher",
         choices=["none", "pytorch", "slurm", "mpi"],
         default="none",
@@ -209,7 +227,15 @@ def main():
             for key in ["interval", "tmpdir", "start", "gpu_collect", "save_best", "rule"]:
                 eval_kwargs.pop(key, None)
             eval_kwargs.update(dict(**kwargs))
-            print(dataset.evaluate(outputs, **eval_kwargs))
+            print(
+                dataset.evaluate(
+                    outputs,
+                    save_bad_cases_num=args.save_bad_cases_num,
+                    conf_th=args.conf_th,
+                    dist_th=args.dist_th,
+                    **eval_kwargs,
+                )
+            )
 
 
 if __name__ == "__main__":

@@ -250,8 +250,15 @@ class DefaultFormatBundle3D(DefaultFormatBundle):
         # Format 3D
         # print("super call", isinstance(results['img'], list), 'format')
         if "points" in results:
-            assert isinstance(results["points"], BasePoints)
-            results["points"] = DC(results["points"].tensor)
+            if isinstance(results["points"], list):
+                points = []
+                for pts in results["points"]:
+                    assert isinstance(pts, BasePoints)
+                    points.append(DC(pts.tensor))
+                results["points"] = points
+            else:
+                assert isinstance(results["points"], BasePoints)
+                results["points"] = DC(results["points"].tensor)
 
         for key in ["voxels", "coors", "voxel_centers", "num_points"]:
             if key not in results:

@@ -7,6 +7,7 @@ import pyquaternion
 import re
 import tempfile
 from glob import glob
+from collections.abc import Iterable
 from mmdet.datasets import DATASETS
 from nuscenes.eval.common.data_classes import EvalBoxes
 from nuscenes.eval.common.loaders import load_prediction
@@ -114,19 +115,39 @@ class XdqDetectionEval(DetectionEval):
 
         if verbose:
             print("Filtering predictions")
-        self.pred_boxes = self.filter_boxes_by_distance(
-            self.pred_boxes, self.cfg.class_range, verbose=verbose
+        self.pred_boxes = self.filter_boxes(
+            self.pred_boxes,
+            self.cfg.class_range,
+            self.cfg.eval_dist_level,
+            self.cfg.eval_dist_interval,
+            self.cfg.eval_num_pts_level,
+            self.cfg.eval_num_pts_interval,
+            verbose=verbose,
         )
         if verbose:
             print("Filtering ground truth annotations")
-        self.gt_boxes = self.filter_boxes_by_distance(
-            self.gt_boxes, self.cfg.class_range, verbose=verbose
+        self.gt_boxes = self.filter_boxes(
+            self.gt_boxes,
+            self.cfg.class_range,
+            self.cfg.eval_dist_level,
+            self.cfg.eval_dist_interval,
+            self.cfg.eval_num_pts_level,
+            self.cfg.eval_num_pts_interval,
+            verbose=verbose,
         )
 
         self.sample_tokens = self.gt_boxes.sample_tokens
 
     @staticmethod
-    def filter_boxes_by_distance(eval_boxes, max_dist, verbose=False):
+    def filter_boxes(
+        eval_boxes,
+        class_range,
+        eval_dist_level,
+        eval_dist_interval,
+        eval_num_pts_level,
+        eval_num_pts_interval,
+        verbose=False,
+    ):
         """
         Applies filtering to boxes. Distance, bike-racks and points per box.
         :param eval_boxes: An instance of the EvalBoxes class.
@@ -134,22 +155,50 @@ class XdqDetectionEval(DetectionEval):
         :param verbose: Whether to print to stdout.
         """
         # Accumulators for number of filtered boxes.
-        total, dist_filter = 0, 0
+        total, max_dist_filter, dist_interval_filter, num_pts_filter = 0, 0, 0, 0
         for sample_token in eval_boxes.sample_tokens:
-            # Filter on distance first.
             total += len(eval_boxes[sample_token])
-            in_range_boxes = []
+
+            # Filter on max distance
+            valid_boxes = []
             for box in eval_boxes[sample_token]:
                 x, y, _ = box.translation
-                dist_thr = max_dist[box.detection_name]
-                if x >= -dist_thr and x <= dist_thr and y >= -dist_thr and y <= dist_thr:
-                    in_range_boxes.append(box)
-            eval_boxes.boxes[sample_token] = in_range_boxes
-            dist_filter += len(eval_boxes[sample_token])
+                dist = (x**2 + y**2) ** 0.5
+                if dist <= class_range[box.detection_name]:
+                    valid_boxes.append(box)
+            eval_boxes.boxes[sample_token] = valid_boxes
+            max_dist_filter += len(eval_boxes.boxes[sample_token])
+
+            if eval_dist_level >= 0:
+                # Filter on distance interval
+                valid_boxes = []
+                min_dist = eval_dist_level * eval_dist_interval
+                max_dist = (eval_dist_level + 1) * eval_dist_interval
+                for box in eval_boxes[sample_token]:
+                    x, y, _ = box.translation
+                    dist = (x**2 + y**2) ** 0.5
+                    if dist >= min_dist and dist <= max_dist:
+                        valid_boxes.append(box)
+                eval_boxes.boxes[sample_token] = valid_boxes
+            dist_interval_filter += len(eval_boxes.boxes[sample_token])
+
+            if eval_num_pts_level >= 0:
+                # Filter on number of points
+                valid_boxes = []
+                min_num = eval_num_pts_level * eval_num_pts_interval
+                # max_num = (eval_num_pts_level + 1) * eval_num_pts_interval
+                for box in eval_boxes[sample_token]:
+                    # if box.num_pts >= min_num and box.num_pts <= max_num:
+                    if box.num_pts >= min_num:
+                        valid_boxes.append(box)
+                eval_boxes.boxes[sample_token] = valid_boxes
+            num_pts_filter += len(eval_boxes.boxes[sample_token])
 
         if verbose:
             print("=> Original number of boxes: %d" % total)
-            print("=> After distance based filtering: %d" % dist_filter)
+            print("=> After max distance based filtering: %d" % max_dist_filter)
+            print("=> After distance interval based filtering: %d" % dist_interval_filter)
+            print("=> After num_pts based filtering: %d" % num_pts_filter)
 
         return eval_boxes
 
@@ -157,12 +206,12 @@ class XdqDetectionEval(DetectionEval):
     def load_gt(data_infos, box_cls, with_unknown_boxes=False, with_hard_boxes=False):
         all_annotations = EvalBoxes()
         for info in data_infos:
-            gt_bboxes_3d, gt_names_3d, _ = load_gt_bboxes_info(
+            gt_bboxes_3d, gt_names_3d, gt_num_pts_3d = load_gt_bboxes_info(
                 info, with_unknown_boxes, with_hard_boxes
             )
 
             sample_boxes = []
-            for i, gt_bbox in enumerate(gt_bboxes_3d):
+            for gt_bbox, gt_name, gt_num_pts in zip(gt_bboxes_3d, gt_names_3d, gt_num_pts_3d):
                 yaw = -gt_bbox[-1] - np.pi / 2
                 q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=yaw).q
                 sample_boxes.append(
@@ -171,7 +220,10 @@ class XdqDetectionEval(DetectionEval):
                         translation=gt_bbox[:3],
                         size=gt_bbox[3:6],
                         rotation=q,
-                        detection_name=gt_names_3d[i],
+                        detection_name=gt_name,
+                        num_pts=gt_num_pts,
+                        # mmdet yaw
+                        yaw=gt_bbox[-1],
                     )
                 )
             all_annotations.add_boxes(info["token"], sample_boxes)
@@ -213,15 +265,17 @@ class XdqDataset(Custom3DDataset):
         box_type_3d="LiDAR",
         filter_empty_gt=True,
         test_mode=False,
-        eval_version="detection_cvpr_2019",
-        only_bad_cases=None,
+        eval_version="detection_xdq_iou_dist",
+        customized_files=None,
     ):
         self.timestamps = timestamps
         self.data_dir = osp.join(data_root, "data")
         self.anno_dir = osp.join(data_root, "annotation")
         self.with_unknown_boxes = with_unknown_boxes
         self.with_hard_boxes = with_hard_boxes
-        self.only_bad_cases = only_bad_cases
+        if customized_files is not None:
+            assert isinstance(customized_files, Iterable)
+        self.customized_files = customized_files
 
         if modality is None:
             modality = dict(
@@ -344,38 +398,74 @@ class XdqDataset(Custom3DDataset):
         return anns_results
 
     def load_annotations(self, ann_file):
+        if self.customized_files is not None:
+            return self.load_anno_from_files(self.customized_files)
+
         data_infos = []
         for ts in self.timestamps:
-            assert osp.isdir(osp.join(self.anno_dir, ts))
-            anno_files = sorted(list(glob(osp.join(self.anno_dir, ts, "*_norm.json"))))
-            for anno_file in anno_files:
-                data_info = json.load(open(anno_file, "r"))
+            if "#" in ts:
+                # 20220922#3/32
+                ts, nids = ts.split("#")
+                nids = nids.split("/")
+                ts_dir = os.path.join(self.anno_dir, ts)
+            else:
+                # 20220922
+                ts_dir = os.path.join(self.anno_dir, ts)
+                nids = os.listdir(ts_dir)
 
-                if not self.with_unknown_boxes or not self.with_hard_boxes:
-                    has_valid_box = False
-                    for obj in data_info["lidar_objs"]:
-                        if obj["type"] == "Unknown" and not self.with_unknown_boxes:
-                            continue
-                        if obj["num_pts"] < 5 and not self.with_hard_boxes:
-                            continue
-                        has_valid_box = True
-                        break
-                    if not has_valid_box:
-                        continue
-
-                pcd_relative_path = re.search(
-                    "[^/?]+/[^/?]+/[^/?]+npy", data_info["pcd_path"].replace(".pcd", "_norm.npy")
-                ).group()
-                pcd_path = osp.join(self.data_dir, pcd_relative_path)
-
-                data_info["token"] = pcd_path.replace("/", "_")
-                if self.only_bad_cases is not None:
-                    if data_info["token"] not in self.only_bad_cases:
-                        continue
-
-                data_info["lidar_path"] = pcd_path
-                data_infos.append(data_info)
+            for nid in nids:
+                nid_dir = os.path.join(ts_dir, nid)
+                data_infos.extend(self.load_anno_from_dir(nid_dir))
         return data_infos
+
+    def load_anno_from_dir(self, dir):
+        anno_files = sorted(list(glob(osp.join(dir, "*_norm.json"))))
+        return self.load_anno_from_files(anno_files)
+
+    def load_anno_from_files(self, anno_files):
+        infos = []
+        for anno_file in anno_files:
+            data_info = json.load(open(anno_file, "r"))
+
+            if not self.with_unknown_boxes or not self.with_hard_boxes:
+                has_valid_box = False
+                for obj in data_info["lidar_objs"]:
+                    if obj["type"] == "Unknown" and not self.with_unknown_boxes:
+                        continue
+                    if obj["num_pts"] < 5 and not self.with_hard_boxes:
+                        continue
+                    has_valid_box = True
+                    break
+                if not has_valid_box:
+                    continue
+
+            pcd_relative_path = re.search(
+                "[^/?]+/[^/?]+/[^/?]+npy", data_info["pcd_path"].replace(".pcd", "_norm.npy")
+            ).group()
+            pcd_path = osp.join(self.data_dir, pcd_relative_path)
+            data_info["token"] = pcd_path.replace("/", "_")
+            data_info["lidar_path"] = pcd_path
+            infos.append(data_info)
+        return infos
+
+    def get_cat_ids(self, idx):
+        """Get category distribution of single scene.
+
+        Args:
+            idx (int): Index of the data_info.
+
+        Returns:
+            dict[list]: for each category, if the current scene
+                contains such boxes, store a list containing idx,
+                otherwise, store empty list.
+        """
+        info = self.data_infos[idx]
+        _, gt_names, _ = load_gt_bboxes_info(info, self.with_unknown_boxes, self.with_hard_boxes)
+        cat_ids = []
+        for name in gt_names:
+            if name in self.CLASSES:
+                cat_ids.append(self.cat2id[name])
+        return cat_ids
 
     def show(self, results, out_dir):
         """Results visualization.
@@ -406,7 +496,9 @@ class XdqDataset(Custom3DDataset):
         result_names=["pts_bbox"],
         show=False,
         out_dir=None,
-        save_bad_cases=False,
+        save_bad_cases_num=0,
+        conf_th=0.3,
+        dist_th=2.0,
     ):
         """Evaluation in nuScenes protocol.
 
@@ -429,10 +521,12 @@ class XdqDataset(Custom3DDataset):
             results_dict = dict()
             for name in result_names:
                 print("Evaluating bboxes of {}".format(name))
-                ret_dict = self._evaluate_single(result_files[name], save_bad_cases)
+                ret_dict = self._evaluate_single(
+                    result_files[name], save_bad_cases_num, conf_th, dist_th
+                )
             results_dict.update(ret_dict)
         elif isinstance(result_files, str):
-            results_dict = self._evaluate_single(result_files, save_bad_cases)
+            results_dict = self._evaluate_single(result_files, save_bad_cases_num, conf_th, dist_th)
 
         if tmp_dir is not None:
             tmp_dir.cleanup()
@@ -449,7 +543,7 @@ class XdqDataset(Custom3DDataset):
                 )
         return results_dict
 
-    def _evaluate_single(self, result_path, save_bad_cases=False):
+    def _evaluate_single(self, result_path, save_bad_cases_num=0, conf_th=0.3, dist_th=2.0):
         """Evaluation for a single model in nuScenes protocol.
 
         Args:
@@ -463,7 +557,7 @@ class XdqDataset(Custom3DDataset):
             "v1.0-mini": "mini_val",
             "v1.0-trainval": "val",
         }
-        nusc_eval = XdqDetectionEval(
+        xdq_eval = XdqDetectionEval(
             self.data_infos,
             config=self.eval_detection_configs,
             result_path=result_path,
@@ -473,14 +567,17 @@ class XdqDataset(Custom3DDataset):
             output_dir=output_dir,
             verbose=True,
         )
-        _, bad_cases = nusc_eval.main(
-            render_curves=False, conf_th=0.3, return_bad_cases=save_bad_cases
+        _, bad_cases = xdq_eval.main(
+            render_curves=False,
+            save_bad_cases_num=save_bad_cases_num,
+            conf_th=conf_th,
+            dist_th=dist_th,
         )
-        if save_bad_cases:
+        if save_bad_cases_num > 0:
             print("#" * 10 + " Bad Cases " + "#" * 10)
             for bad_case in bad_cases:
                 print(bad_case)
-            print("#" * 20)
+            print("#" * 31)
             np.save("bad_cases.npy", bad_cases)
 
         # record metrics
@@ -569,6 +666,8 @@ class XdqDataset(Custom3DDataset):
                     size=box.wlh.tolist(),
                     rotation=box.orientation.elements.tolist(),
                     velocity=box.velocity[:2].tolist(),
+                    num_pts=box.num_pts,
+                    yaw=box.yaw,
                     detection_name=name,
                     detection_score=box.score,
                     attribute_name="",
@@ -643,6 +742,7 @@ def output_to_nusc_box(detection):
     box3d = detection["boxes_3d"]
     scores = detection["scores_3d"].numpy()
     labels = detection["labels_3d"].numpy()
+    num_pts = detection["num_pts_3d"]
 
     box_gravity_center = box3d.gravity_center.numpy()
     box_dims = box3d.dims.numpy()
@@ -662,6 +762,8 @@ def output_to_nusc_box(detection):
             label=labels[i],
             score=scores[i],
             velocity=velocity,
+            num_pts=num_pts[i],
+            yaw=box3d.yaw.numpy()[i],
         )
         box_list.append(box)
     return box_list

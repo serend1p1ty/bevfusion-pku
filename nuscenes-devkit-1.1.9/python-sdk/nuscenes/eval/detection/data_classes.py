@@ -7,7 +7,7 @@ from typing import List, Dict, Tuple
 import numpy as np
 
 from nuscenes.eval.common.data_classes import MetricData, EvalBox
-from nuscenes.eval.common.utils import center_distance
+from nuscenes.eval.common.utils import center_distance, iou_distance
 from nuscenes.eval.detection.constants import DETECTION_NAMES, ATTRIBUTE_NAMES, TP_METRICS
 
 
@@ -24,6 +24,10 @@ class DetectionConfig:
         min_precision: float,
         max_boxes_per_sample: int,
         mean_ap_weight: int,
+        eval_dist_level: int,
+        eval_dist_interval: float,
+        eval_num_pts_level: int,
+        eval_num_pts_interval: int,
     ):
 
         assert set(class_range.keys()) == set(DETECTION_NAMES), "Class count mismatch."
@@ -39,6 +43,10 @@ class DetectionConfig:
         self.mean_ap_weight = mean_ap_weight
 
         self.class_names = self.class_range.keys()
+        self.eval_dist_level = eval_dist_level
+        self.eval_dist_interval = eval_dist_interval
+        self.eval_num_pts_level = eval_num_pts_level
+        self.eval_num_pts_interval = eval_num_pts_interval
 
     def __eq__(self, other):
         eq = True
@@ -71,6 +79,10 @@ class DetectionConfig:
             content["min_precision"],
             content["max_boxes_per_sample"],
             content["mean_ap_weight"],
+            content["eval_dist_level"],
+            content["eval_dist_interval"],
+            content["eval_num_pts_level"],
+            content["eval_num_pts_interval"],
         )
 
     @property
@@ -78,6 +90,8 @@ class DetectionConfig:
         """Return the distance function corresponding to the dist_fcn string."""
         if self.dist_fcn == "center_distance":
             return center_distance
+        elif self.dist_fcn == "iou_distance":
+            return iou_distance
         else:
             raise Exception("Error: Unknown distance function %s!" % self.dist_fcn)
 
@@ -235,7 +249,8 @@ class DetectionMetrics:
     def eval_classes(self):
         classes = []
         for class_name, d in self._label_aps.items():
-            if class_name in ["car", "truck", "pedestrian", "bicycle"] and max(d.values()) > 0.1:
+            # if class_name in ["car", "truck", "pedestrian", "bicycle"] and max(d.values()) > 0.1:
+            if class_name in ["car", "truck", "pedestrian", "bicycle"]:
                 classes.append(class_name)
         return classes
 
@@ -296,8 +311,6 @@ class DetectionMetrics:
         :return: The NDS.
         """
         # Summarize.
-        #### modified ####
-        self.cfg.mean_ap_weight = 4.0
         total = float(
             self.cfg.mean_ap_weight * self.mean_ap + np.sum(list(self.tp_scores.values()))
         )
@@ -363,13 +376,21 @@ class DetectionBox(EvalBox):
         size: Tuple[float, float, float] = (0, 0, 0),
         rotation: Tuple[float, float, float, float] = (0, 0, 0, 0),
         velocity: Tuple[float, float] = (0, 0),
-        ego_translation: [float, float, float] = (0, 0, 0),  # Translation to ego vehicle in meters.
-        num_pts: int = -1,  # Nbr. LIDAR or RADAR inside the box. Only for gt boxes.
-        detection_name: str = "car",  # The class name used in the detection challenge.
-        detection_score: float = -1.0,  # GT samples do not have a score.
+        # Translation to ego vehicle in meters.
+        ego_translation: Tuple[float, float, float] = (0, 0, 0),
+        # Nbr. LIDAR or RADAR inside the box. Only for gt boxes.
+        num_pts: int = -1,
+        # Yaw in mmdet format
+        yaw: float = 0.0,
+        # The class name used in the detection challenge.
+        detection_name: str = "car",
+        # GT samples do not have a score.
+        detection_score: float = -1.0,
+        # Box attribute. Each box can have at most 1 attribute.
         attribute_name: str = "",
-    ):  # Box attribute. Each box can have at most 1 attribute.
+    ):
 
+        self.yaw = yaw
         super().__init__(
             sample_token, translation, size, rotation, velocity, ego_translation, num_pts
         )
@@ -418,6 +439,7 @@ class DetectionBox(EvalBox):
             "detection_name": self.detection_name,
             "detection_score": self.detection_score,
             "attribute_name": self.attribute_name,
+            "yaw": self.yaw,
         }
 
     @classmethod
@@ -438,6 +460,7 @@ class DetectionBox(EvalBox):
             if "detection_score" not in content
             else float(content["detection_score"]),
             attribute_name=content["attribute_name"],
+            yaw=content["yaw"],
         )
 
 

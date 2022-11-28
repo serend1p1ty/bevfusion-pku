@@ -1,12 +1,23 @@
 import mmcv
 import torch
+import numpy as np
 from mmcv.parallel import DataContainer as DC
 from mmcv.runner import force_fp32
 from os import path as osp
 from torch import nn as nn
 from torch.nn import functional as F
+from attributedict.collections import AttributeDict
 
-from mmdet3d.core import Box3DMode, Coord3DMode, bbox3d2result, merge_aug_bboxes_3d, show_result
+from mmdet3d.core import (
+    Box3DMode,
+    Coord3DMode,
+    LiDARInstance3DBoxes,
+    bbox3d2result,
+    box3d_multiclass_nms,
+    merge_aug_bboxes_3d,
+    show_result,
+    xywhr2xyxyr,
+)
 from mmdet3d.ops import Voxelization
 from mmdet.core import multi_apply
 from mmdet.models import DETECTORS
@@ -315,7 +326,7 @@ class MVXTwoStageDetector(Base3DDetector):
     def forward_pts_train(
         self,
         pts_feats,
-        #   img_feats,
+        # img_feats,
         gt_bboxes_3d,
         gt_labels_3d,
         img_metas,
@@ -425,8 +436,95 @@ class MVXTwoStageDetector(Base3DDetector):
         ]
         return bbox_results
 
-    def simple_test(self, points, img_metas, img=None, rescale=False):
+    def simple_test(self, points, img_metas, img=None, rescale=False, cal_num_pts=True):
         """Test function without augmentaiton."""
+        if len(points) > 1:
+            # Split BEV LiDAR
+            boxes_3d = torch.zeros((0, 9))
+            scores_3d = torch.zeros(0)
+            labels_3d = torch.zeros(0)
+            lidar_boxes, lidar_scores, lidar_labels = [], [], []
+            for pts in points:
+                res = self.simple_test_lidar_points(pts, img_metas, img, rescale)
+                boxes_3d = torch.cat((boxes_3d, res[0]["pts_bbox"]["boxes_3d"].tensor))
+                scores_3d = torch.cat((scores_3d, res[0]["pts_bbox"]["scores_3d"]))
+                labels_3d = torch.cat((labels_3d, res[0]["pts_bbox"]["labels_3d"]))
+                lidar_boxes.append(res[0]["pts_bbox"]["boxes_3d"])
+                lidar_scores.append(res[0]["pts_bbox"]["scores_3d"])
+                lidar_labels.append(res[0]["pts_bbox"]["labels_3d"])
+
+            # multi-classes nms
+            mlvl_bboxes = boxes_3d
+            mlvl_bboxes_for_nms = xywhr2xyxyr(LiDARInstance3DBoxes(mlvl_bboxes, box_dim=9).bev)
+            # the last class is background
+            mlvl_scores = torch.zeros((mlvl_bboxes.shape[0], 11))
+            for i, (label, score) in enumerate(zip(labels_3d, scores_3d)):
+                mlvl_scores[i][int(label)] = score
+            cfg = AttributeDict(
+                {
+                    "use_rotate_nms": True,
+                    "nms_across_levels": False,
+                    "nms_pre": 1000,
+                    "nms_thr": 0.2,
+                    "score_thr": 0.05,
+                    "min_bbox_size": 0,
+                    "max_num": 500,
+                }
+            )
+            bboxes, scores, labels, _ = box3d_multiclass_nms(
+                mlvl_bboxes.cuda(),
+                mlvl_bboxes_for_nms.cuda(),
+                mlvl_scores.cuda(),
+                0.05,
+                cfg["max_num"],
+                cfg,
+            )
+
+            result = [
+                dict(
+                    pts_bbox=dict(
+                        boxes_3d=LiDARInstance3DBoxes(bboxes.cpu(), box_dim=9),
+                        scores_3d=scores.cpu(),
+                        labels_3d=labels.cpu(),
+                        lidar_boxes=lidar_boxes,
+                        lidar_scores=lidar_scores,
+                        lidar_labels=lidar_labels,
+                    )
+                )
+            ]
+            return result
+        else:
+            outputs = self.simple_test_lidar_points(points, img_metas, img, rescale)
+            if cal_num_pts:
+                outputs = self.attach_num_pts(points, outputs)
+            return outputs
+
+    def get_points_in_box(self, points, box):
+        box_min_xyz = box.min(axis=0).reshape(-1)
+        box_max_xyz = box.max(axis=0).reshape(-1)
+
+        val_flag_x = np.logical_and(points[:, 0] >= box_min_xyz[0], points[:, 0] < box_max_xyz[0])
+        val_flag_y = np.logical_and(points[:, 1] >= box_min_xyz[1], points[:, 1] < box_max_xyz[1])
+        val_flag_z = np.logical_and(points[:, 2] >= box_min_xyz[2], points[:, 2] < box_max_xyz[2])
+        val_flag_merge = np.logical_and(np.logical_and(val_flag_x, val_flag_y), val_flag_z)
+
+        box_points = points[val_flag_merge]
+
+        return box_points
+
+    def attach_num_pts(self, points, outputs):
+        assert len(outputs) == 1
+        if outputs[0]["pts_bbox"]["boxes_3d"].tensor.shape[0] == 0:
+            return outputs
+        bboxes_corners = outputs[0]["pts_bbox"]["boxes_3d"].corners.numpy()
+        points = points[0].cpu().numpy()
+        num_pts = []
+        for bbox_corners in bboxes_corners:
+            num_pts.append(self.get_points_in_box(points, bbox_corners).shape[0])
+        outputs[0]["pts_bbox"]["num_pts_3d"] = num_pts
+        return outputs
+
+    def simple_test_lidar_points(self, points, img_metas, img=None, rescale=False):
         img_feats, pts_feats = self.extract_feat(points, img=img, img_metas=img_metas)
 
         bbox_list = [dict() for i in range(len(img_metas))]

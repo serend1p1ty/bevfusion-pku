@@ -8,7 +8,6 @@ from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines import RandomFlip
 from ..registry import OBJECTSAMPLERS
 from .data_augment_utils import noise_per_object_v3_
-import json
 
 
 @PIPELINES.register_module()
@@ -345,7 +344,11 @@ class GlobalRotScaleTrans(object):
         translation_std = np.array(translation_std, dtype=np.float32)
         trans_factor = np.random.normal(scale=translation_std, size=3).T
 
-        input_dict["points"].translate(trans_factor)
+        points = input_dict["points"]
+        if isinstance(points, list):
+            [points[i].translate(trans_factor) for i, _ in enumerate(points)]
+        else:
+            points.translate(trans_factor)
         input_dict["pcd_trans"] = trans_factor
         for key in input_dict["bbox3d_fields"]:
             input_dict[key].translate(trans_factor)
@@ -385,7 +388,10 @@ class GlobalRotScaleTrans(object):
         """
         scale = input_dict["pcd_scale_factor"]
         points = input_dict["points"]
-        points.scale(scale)
+        if isinstance(points, list):
+            [points[i].scale(scale) for i, _ in enumerate(points)]
+        else:
+            points.scale(scale)
         if self.shift_height:
             assert "height" in points.attribute_dims.keys()
             points.tensor[:, points.attribute_dims["height"]] *= scale
@@ -544,9 +550,14 @@ class PointsRangeFilter(object):
         # print('before PointsRangeFilter call', isinstance(input_dict['img'], list))
 
         points = input_dict["points"]
-        points_mask = points.in_range_3d(self.pcd_range)
-        clean_points = points[points_mask]
-        input_dict["points"] = clean_points
+        if isinstance(points, list):
+            for i, _ in enumerate(points):
+                points_mask = points[i].in_range_3d(self.pcd_range)
+                points[i] = points[i][points_mask]
+        else:
+            points_mask = points.in_range_3d(self.pcd_range)
+            clean_points = points[points_mask]
+            input_dict["points"] = clean_points
         # print('after PointsRangeFilter call', isinstance(input_dict['img'], list))
 
         return input_dict

@@ -46,21 +46,19 @@ def main(args):
         all_annos.append(json.load(open(file_path)))
     print(f"Num of total files: {len(all_file_paths)}")
 
-    def sample(nid, ratio=0.1, min_box_num=4, hard=False):
-        if not hard:
-            nid_file_paths = [
-                file_path
-                for file_path, anno in zip(all_file_paths, all_annos)
-                if anno["nid"] == nid and len(anno["lidar_objs"]) >= min_box_num
-            ]
-        else:
-            nid_file_paths = []
-            for file_path, anno in zip(all_file_paths, all_annos):
-                if anno["nid"] != nid or len(anno["lidar_objs"]) < min_box_num:
-                    continue
-                hard_objs = [obj for obj in anno["lidar_objs"] if obj["num_pts"] < 5]
-                if len(hard_objs) < 0.4 * len(anno["lidar_objs"]):
-                    continue
+    def sample(nid, ratio=0.1, min_box_num=4):
+        nid_file_paths = []
+        for file_path, anno in zip(all_file_paths, all_annos):
+            if anno["nid"] != nid or len(anno["lidar_objs"]) < min_box_num:
+                continue
+            in_range_cnt = 0
+            for obj in anno["lidar_objs"]:
+                box = np.array(obj["3d_box"])
+                center_x, center_y, _ = box.mean(axis=0)
+                dist = (center_x**2 + center_y**2) ** 0.5
+                if dist >= 100 and dist < 150:
+                    in_range_cnt += 1
+            if in_range_cnt >= 0.3 * len(anno["lidar_objs"]):
                 nid_file_paths.append(file_path)
         total_num = len(nid_file_paths)
         sample_num = int(total_num * ratio)
@@ -71,10 +69,9 @@ def main(args):
     for nid, samplenum in nid2samplenum.items():
         if samplenum > 2000:
             nid_test_files = sample(nid)
-            nid_test_files_hard = sample(nid, hard=True)
-            all_test_files = all_test_files | set(nid_test_files) | set(nid_test_files_hard)
+            all_test_files = all_test_files | set(nid_test_files)
             copy_files(nid_test_files, os.path.join(args.data_dir, "test"))
-            copy_files(nid_test_files_hard, os.path.join(args.data_dir, "test_hard"))
+    print(len(all_test_files))
 
     all_train_files = set(all_file_paths) - all_test_files
     print(f"Total {len(all_train_files)} train files, {len(all_test_files)} test files.")

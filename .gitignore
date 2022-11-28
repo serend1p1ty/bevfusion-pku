@@ -126,5 +126,6 @@ exps/
 /data/sunrgbd/OFFICIAL_SUNRGBD/
 *.obj
 *.ply
+*.npy
 ossutil_output
 vis_outputs

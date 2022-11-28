@@ -271,10 +271,11 @@ class LiftSplatShoot(nn.Module):
         points = rots.view(B, N, 1, 1, 1, 3, 3).matmul(points).squeeze(-1)
         points += trans.view(B, N, 1, 1, 1, 3)
 
-        assert isinstance(nid, str)
-        norm_offset = torch.Tensor(self.norm_offsets[nid]).to(points.device)
-        # After normalize, -3.1446 <= points_z <= 7.3388, is it normal?
-        points += norm_offset
+        if nid is not None:
+            assert isinstance(nid, str)
+            norm_offset = torch.Tensor(self.norm_offsets[nid]).to(points.device)
+            # After normalize, -3.1446 <= points_z <= 7.3388, is it normal?
+            points += norm_offset
 
         return points
 
@@ -345,6 +346,17 @@ class LiftSplatShoot(nn.Module):
     def get_voxels(self, x, rots=None, trans=None, post_rots=None, post_trans=None, nid=None):
         geom = self.get_geometry(rots, trans, post_rots, post_trans, nid)
         x, depth = self.get_cam_feats(x)
+        # import matplotlib.pyplot as plt
+        # dep = depth[0][0].max(dim=0)[1]
+        # h, w = dep.shape
+        # pts, colors = [], []
+        # for i in range(h):
+        #     for j in range(w):
+        #         pts.append([j, h - i])
+        #         colors.append(dep[i][j])
+        # pts = np.array(pts)
+        # plt.scatter(pts[:, 0], pts[:, 1], c=colors, s=1)
+        # plt.savefig("depth.png")
         x = self.voxel_pooling(geom, x)
         return x, depth
 
@@ -368,7 +380,9 @@ class LiftSplatShoot(nn.Module):
         sample_idx=None,
     ):
         assert isinstance(sample_idx, int)
-        nid = img_metas[sample_idx]["nid"]
+        # from shutil import copyfile
+        # copyfile(img_metas[0]["filename"][0], "img.png")
+        nid = img_metas[sample_idx].get("nid", None)
         # [2, 64, 16, 200, 200]
         x, depth = self.get_voxels(x, rots, trans, post_rots, post_trans, nid)  # [B, C, H, W, L]
         # [2, 1024, 200, 200]

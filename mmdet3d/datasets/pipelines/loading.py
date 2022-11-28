@@ -2,7 +2,7 @@ import mmcv
 import numpy as np
 import torch
 
-from mmdet3d.core.points import BasePoints, get_points_type
+from mmdet3d.core.points import BasePoints, get_points_type, LiDARPoints
 from mmdet3d.core.visualizer.image_vis import project_pts_on_img, map_pointcloud_to_image
 from mmdet3d.core.utils.gaussian import generate_guassian_depth_target
 from mmdet.datasets.builder import PIPELINES
@@ -410,6 +410,26 @@ class MyPad(object):
 
 
 @PIPELINES.register_module()
+class SplitBEVLiDAR(object):
+    """Split BEV LiDAR points to list of single LiDAR points."""
+
+    def __call__(self, results):
+        """
+        Args:
+            results (dict): Result dict from loading pipeline.
+
+        Returns:
+            dict: Split results, result["points"] is list of LiDARPoints object.
+        """
+        each_lidar_points = results["points"].tensor.split(24000)
+        results["points"] = [
+            LiDARPoints(lidar_points, points_dim=lidar_points.shape[1])
+            for lidar_points in each_lidar_points
+        ]
+        return results
+
+
+@PIPELINES.register_module()
 class LoadMultiViewImageFromFiles(object):
     """Load multi channel images from a list of separate channel files.
 
@@ -491,13 +511,15 @@ class LoadMultiViewImageFromFiles(object):
         if self.project_pts_to_img_depth:
             # results['img_fields'].append('img_depth')
             results["img_depth"] = []
-            for i in range(len(results["img"])):
-                # project_pts_on_img(results['points'].tensor.numpy(), results['img'][i], results['lidar2img'][i])
+            # must copy, or else results["points"].tensor will be influenced
+            points = results["points"].tensor.numpy().copy()
+            if "nid" in results:
                 # 从磁盘读取的是归一化后的点云，需要撤销归一化，否则投影不准。
                 nid = results["nid"]
                 norm_offset = self.norm_offsets[nid]
-                points = results["points"].tensor.numpy().copy()
                 points[:, :3] -= norm_offset
+            for i in range(len(results["img"])):
+                # project_pts_on_img(results['points'].tensor.numpy(), results['img'][i], results['lidar2img'][i])
                 depth = map_pointcloud_to_image(
                     points,
                     results["img"][i],
@@ -512,6 +534,16 @@ class LoadMultiViewImageFromFiles(object):
                     cam_depth_range=self.cam_depth_range,
                     constant_std=self.constant_std,
                 )
+                # import matplotlib.pyplot as plt
+                # h, w = min_depth.shape[1:]
+                # pts, colors = [], []
+                # for i in range(h):
+                #     for j in range(w):
+                #         pts.append([j, h - i])
+                #         colors.append(min_depth[0][i][j])
+                # pts = np.array(pts)
+                # plt.scatter(pts[:, 0], pts[:, 1], c=colors, s=1)
+                # plt.savefig("depth.png")
                 depth = torch.cat([min_depth[0].unsqueeze(-1), guassian_depth[0]], dim=-1)
                 results["img_depth"].append(depth)
         return results
@@ -684,40 +716,45 @@ class LoadPointsFromMultiSweeps(object):
                 - points (np.ndarray): Multi-sweep point cloud arrays.
         """
         points = results["points"]
-        points.tensor[:, 4] = 0
-        sweep_points_list = [points]
-        ts = results["timestamp"]
-        if self.pad_empty_sweeps and len(results["sweeps"]) == 0:
-            for i in range(self.sweeps_num):
-                if self.remove_close:
-                    sweep_points_list.append(self._remove_close(points))
-                else:
-                    sweep_points_list.append(points)
+        if isinstance(points, list):
+            for i, _ in enumerate(points):
+                points[i].tensor[:, 4] = 0
+                points[i] = points[i][:, self.use_dim]
         else:
-            if len(results["sweeps"]) <= self.sweeps_num:
-                choices = np.arange(len(results["sweeps"]))
-            elif self.test_mode:
-                choices = np.arange(self.sweeps_num)
+            points.tensor[:, 4] = 0
+            sweep_points_list = [points]
+            ts = results["timestamp"]
+            if self.pad_empty_sweeps and len(results["sweeps"]) == 0:
+                for i in range(self.sweeps_num):
+                    if self.remove_close:
+                        sweep_points_list.append(self._remove_close(points))
+                    else:
+                        sweep_points_list.append(points)
             else:
-                choices = np.random.choice(len(results["sweeps"]), self.sweeps_num, replace=False)
-            for idx in choices:
-                sweep = results["sweeps"][idx]
-                points_sweep = self._load_points(sweep["data_path"])
-                points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
-                if self.remove_close:
-                    points_sweep = self._remove_close(points_sweep)
-                sweep_ts = sweep["timestamp"] / 1e6
-                points_sweep[:, :3] = points_sweep[:, :3] @ sweep["sensor2lidar_rotation"].T
-                points_sweep[:, :3] += sweep["sensor2lidar_translation"]
-                points_sweep[:, 4] = ts - sweep_ts
-                points_sweep = points.new_point(points_sweep)
-                sweep_points_list.append(points_sweep)
+                if len(results["sweeps"]) <= self.sweeps_num:
+                    choices = np.arange(len(results["sweeps"]))
+                elif self.test_mode:
+                    choices = np.arange(self.sweeps_num)
+                else:
+                    choices = np.random.choice(len(results["sweeps"]), self.sweeps_num, replace=False)
+                for idx in choices:
+                    sweep = results["sweeps"][idx]
+                    points_sweep = self._load_points(sweep["data_path"])
+                    points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
+                    if self.remove_close:
+                        points_sweep = self._remove_close(points_sweep)
+                    sweep_ts = sweep["timestamp"] / 1e6
+                    points_sweep[:, :3] = points_sweep[:, :3] @ sweep["sensor2lidar_rotation"].T
+                    points_sweep[:, :3] += sweep["sensor2lidar_translation"]
+                    points_sweep[:, 4] = ts - sweep_ts
+                    points_sweep = points.new_point(points_sweep)
+                    sweep_points_list.append(points_sweep)
 
-        points = points.cat(sweep_points_list)
-        if self.filter_by_angle:
-            points = self.filter_point_by_angle(points)
+            points = points.cat(sweep_points_list)
+            if self.filter_by_angle:
+                points = self.filter_point_by_angle(points)
 
-        points = points[:, self.use_dim]
+            points = points[:, self.use_dim]
         results["points"] = points
         return results
 

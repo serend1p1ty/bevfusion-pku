@@ -3,6 +3,7 @@ import cv2
 import mmcv
 import numpy as np
 import os
+import matplotlib
 from matplotlib import pyplot as plt
 from typing import List, Optional, Tuple
 
@@ -45,6 +46,7 @@ def visualize_camera(
     *,
     bboxes: Optional[LiDARInstance3DBoxes] = None,
     labels: Optional[np.ndarray] = None,
+    scores: Optional[np.ndarray] = None,
     transform: Optional[np.ndarray] = None,
     classes: Optional[List[str]] = None,
     color: Optional[Tuple[int, int, int]] = None,
@@ -63,6 +65,7 @@ def visualize_camera(
         coords = coords.reshape(-1, 8, 4)
 
         indices = np.all(coords[..., 2] > 0, axis=1)
+        indices = np.where(indices == True)[0]
         coords = coords[indices]
         labels = labels[indices]
 
@@ -74,6 +77,27 @@ def visualize_camera(
         coords = coords[..., :2].reshape(-1, 8, 2)
         for index in range(coords.shape[0]):
             name = classes[labels[index]]
+            min_x, min_y = coords[index].min(axis=0).astype(np.int)
+            max_x, max_y = coords[index].max(axis=0).astype(np.int)
+            h, w = canvas.shape[:2]
+            if min_x < w and max_x >= 0 and min_y < h and max_y >= 0:
+                # the box is visible in image
+                min_x = np.clip(min_x, 0, w - 1)
+                min_y = np.clip(min_y, 0, h - 1)
+                orig_index = indices[index]
+                if scores is not None:
+                    orig_score = scores[orig_index]
+                    label = "%s: %.2f" % (orig_index, orig_score)
+                else:
+                    label = str(orig_index)
+                cv2.putText(
+                    canvas,
+                    label,
+                    (min_x, min_y - thickness),
+                    fontFace=cv2.FONT_HERSHEY_COMPLEX,
+                    fontScale=0.6,
+                    color=(0, 0, 255),
+                )
             for start, end in [
                 (0, 1),
                 (0, 3),
@@ -113,30 +137,44 @@ def visualize_lidar(
     xlim: Tuple[float, float] = (-50, 50),
     ylim: Tuple[float, float] = (-50, 50),
     color: Optional[Tuple[int, int, int]] = None,
-    radius: float = 15,
+    radius: float = 90,
     thickness: float = 25,
-    draw_origin: bool = False,
 ) -> None:
+    # dpi is small (10), so we need to use bigger font size
+    matplotlib.rcParams.update({"font.size": 200})
     fig = plt.figure(figsize=(xlim[1] - xlim[0], ylim[1] - ylim[0]))
 
     ax = plt.gca()
+    # ax.set_xticks(np.arange(-300, 300, 10))
+    # ax.set_xticklabels([str(i) for i in np.arange(-300, 300, 10)], rotation=40)
+    # ax.set_yticks(np.arange(-300, 300, 10))
+    # ax.tick_params(labelcolor="orange")
     ax.set_xlim(*xlim)
     ax.set_ylim(*ylim)
     ax.set_aspect(1)
     ax.set_axis_off()
+    # ax.set_facecolor("black")
 
     if lidar_points is not None:
         plt.scatter(
             lidar_points[:, 0],
             lidar_points[:, 1],
             s=radius,
-            c="white",
+            # c="white",
+            c="blue",
         )
 
     if bboxes is not None and len(bboxes) > 0:
         coords = bboxes.corners[:, [0, 3, 7, 4, 0], :2]
         for index in range(coords.shape[0]):
             name = classes[labels[index]]
+            plt.text(
+                coords[index, :, 0].min(),
+                coords[index, :, 1].max(),
+                str(index),
+                color="orange",
+                fontsize=80,
+            )
             plt.plot(
                 coords[index, :, 0],
                 coords[index, :, 1],
@@ -144,15 +182,11 @@ def visualize_lidar(
                 color=np.array(color or OBJECT_PALETTE[name]) / 255,
             )
 
-    if draw_origin:
-        plt.plot((0, 0), (0, 10), linewidth=50, color=(0, 1, 0))
-        plt.plot((0, 10), (0, 0), linewidth=50, color=(0, 0, 1))
-
     mmcv.mkdir_or_exist(os.path.dirname(fpath))
     fig.savefig(
         fpath,
         dpi=10,
-        facecolor="black",
+        # facecolor="black",
         format="png",
         bbox_inches="tight",
         pad_inches=0,

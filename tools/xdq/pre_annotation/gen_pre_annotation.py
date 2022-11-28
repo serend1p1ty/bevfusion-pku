@@ -20,6 +20,14 @@ from mmdet3d.datasets import build_dataloader, XdqDataset
 from mmdet3d.datasets.pipelines import Compose
 from mmdet3d.models import build_detector
 
+cls_mapper = {
+    "pedestrian": "行人",
+    "truck": "卡车货车",
+    "car": "汽车",
+    "bicycle": "自行车",
+    "traffic_cone": "锥桶",
+}
+
 
 class LongmaoDataset(Custom3DDataset):
     def __init__(self, data_dir, pipelines, use_camera=True, test_mode=True):
@@ -61,7 +69,7 @@ class LongmaoDataset(Custom3DDataset):
             img_paths = []
             lidar2img_rts = []
             for img_url in info[1:]:
-                if img_url == "":
+                if img_url in ["", "\n"]:
                     continue
                 res = re.search("([^/?]+)/([0-9])[^/?]+jpg", img_url)
                 relative_path = res.group().split("/")
@@ -133,12 +141,15 @@ def main():
     # By default, use the test split pipeline.
     dataset = LongmaoDataset(args.longmao_dir, cfg.data["test"]["pipeline"])
 
+    shuffle = False
+    if shuffle:
+        dataset.flag = np.zeros(len(dataset), dtype=np.uint8)
     data_loader = build_dataloader(
         dataset,
         samples_per_gpu=1,
         workers_per_gpu=cfg.data.workers_per_gpu,
         dist=distributed,
-        shuffle=False,
+        shuffle=shuffle,
     )
 
     # build the model and load checkpoint
@@ -162,10 +173,15 @@ def main():
             outputs = model(return_loss=False, **data)[0]["pts_bbox"]
 
         if not args.vis:
+            if outputs["boxes_3d"].tensor.shape[0] == 0:
+                continue
             anno_dict = {
                 "pre_anno": {
                     "bboxes": (outputs["boxes_3d"].corners - torch.Tensor(norm_offset)).tolist(),
-                    "labels": [XdqDataset.CLASSES[label_idx] for label_idx in outputs["labels_3d"]],
+                    "labels": [
+                        cls_mapper[XdqDataset.CLASSES[label_idx]]
+                        for label_idx in outputs["labels_3d"]
+                    ],
                 }
             }
             save_path = (
@@ -175,7 +191,7 @@ def main():
             )
             save_dir = os.path.dirname(save_path)
             os.makedirs(save_dir, exist_ok=True)
-            json.dump(anno_dict, open(save_path, "w"), indent=4)
+            json.dump(anno_dict, open(save_path, "w"), indent=4, ensure_ascii=False)
 
         if not args.vis:
             continue

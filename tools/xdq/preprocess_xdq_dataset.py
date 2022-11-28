@@ -8,20 +8,36 @@ from glob import glob
 from tqdm import tqdm
 
 # calculated by cal_xyz_offset(), used to normalize point cloud to origin-centered, z=-5 grounded
+# norm_offsets = {
+#     "1": [-4.46, -34.1, 45.75],
+#     "2": [-23.32, 35.89, 45.75],
+#     "3": [-4.64, 71.39, 45.34],
+#     "7": [-17.48, -19.43, 45.19],
+#     "12": [184.74, -78.32, 45.99],
+#     "16": [33.16, 83.63, 46.91],
+#     "17": [-18.74, -35.58, 45.41],
+#     "19": [-12.4, -52.47, 46.21],
+#     "21": [12.77, 71.73, 45.6],
+#     "32": [48.12, -0.02, 45.93],
+#     "33": [-53.45, -6.59, 45.97],
+#     "34": [-8.23, -31.04, 45.71],
+#     "35": [63.23, 49.72, 46.03],
+# }
+# hand-craft
 norm_offsets = {
-    "1": [-4.46, -34.1, 45.75],
+    "1": [22, -70, 45.75],
     "2": [-23.32, 35.89, 45.75],
-    "3": [-4.64, 71.39, 45.34],
-    "7": [-17.48, -19.43, 45.19],
-    "12": [184.74, -78.32, 45.99],
-    "16": [33.16, 83.63, 46.91],
-    "17": [-18.74, -35.58, 45.41],
-    "19": [-12.4, -52.47, 46.21],
-    "21": [12.77, 71.73, 45.6],
-    "32": [48.12, -0.02, 45.93],
-    "33": [-53.45, -6.59, 45.97],
-    "34": [-8.23, -31.04, 45.71],
-    "35": [63.23, 49.72, 46.03],
+    "3": [-25, 98, 45.34],
+    "7": [-65, -31, 45.19],
+    "12": [290, -120, 45.99],
+    "16": [-50, 62, 46.91],
+    "17": [8, -8, 45.41],
+    "19": [39, -68, 46.21],
+    "21": [19, 73, 45.6],
+    "32": [55, 12, 45.93],
+    "33": [-75, 1, 45.97],
+    "34": [-9, -5, 45.71],
+    "35": [55, 55, 46.03],
 }
 
 
@@ -86,7 +102,8 @@ def cal_xyz_offset():
 
 
 def normalize_coordinate():
-    anno_files = glob(os.path.join(anno_dir, "*/*.json"))
+    anno_files = glob(os.path.join(anno_dir, "*/*/*.json"))
+    invalid_files = []
     for anno_file in tqdm(anno_files):
         if "20220720" in anno_file:
             continue
@@ -99,6 +116,7 @@ def normalize_coordinate():
         norm_offset = norm_offsets[nid]
 
         if len(anno["lidar_objs"]) == 0:
+            invalid_files.append(anno_file)
             continue
 
         pcd_relative_path = re.search(
@@ -124,12 +142,46 @@ def normalize_coordinate():
         points += norm_offset + [0.0]
         save_path = pcd_path.replace(".npy", "_norm.npy")
         np.save(save_path, points)
+    print(invalid_files)
+
+
+def fix_cam_lidar_mismatch(fix=False):
+    anno_files = glob(os.path.join(anno_dir, "*/*/*_norm.json"))
+    mismatch_num = 0
+    # cam is more than lidar
+    mismatch_more = []
+    # cam is less than lidar
+    mismatch_less = []
+    for anno_file in tqdm(anno_files):
+        anno = json.load(open(anno_file))
+        pcd_relative_path = re.search(
+            "[^/?]+/[^/?]+/[^/?]+npy", anno["pcd_path"].replace(".pcd", "_norm.npy")
+        ).group()
+        pcd_path = os.path.join(data_dir, pcd_relative_path)
+        points = np.load(pcd_path)
+        assert points.shape[0] % 24000 == 0
+        lidar_num = points.shape[0] / 24000
+        cam_num = len(anno["cams"])
+        if cam_num > lidar_num:
+            mismatch_num += 1
+            mismatch_more.append(anno_file)
+        if cam_num < lidar_num:
+            mismatch_num += 1
+            mismatch_less.append(anno_file)
+    print(f"Total mismatch_num: {mismatch_num}")
+    print(f"##### {len(mismatch_more)} files, cam is more than LiDAR: {mismatch_more}")
+    print(f"##### {len(mismatch_less)} files, cam is less than LiDAR: {mismatch_less}")
+
+    if fix:
+        for anno_file in mismatch_less + mismatch_more:
+            os.remove(anno_file)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cal-offset", action="store_true")
     parser.add_argument("--norm", action="store_true")
+    parser.add_argument("--fix-mismatch", action="store_true")
     parser.add_argument("--dataset-dir", default="data/xdq")
     args = parser.parse_args()
 
@@ -142,4 +194,8 @@ if __name__ == "__main__":
 
     if args.norm:
         normalize_coordinate()
+        exit(0)
+
+    if args.fix_mismatch:
+        fix_cam_lidar_mismatch()
         exit(0)

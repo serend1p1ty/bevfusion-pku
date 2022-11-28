@@ -20,7 +20,11 @@ def parse_args():
     parser.add_argument("--mode", type=str, default="gt", choices=["gt", "pred"])
     parser.add_argument("--only-bad-cases", action="store_true")
     parser.add_argument("--checkpoint", help="checkpoint file")
-    parser.add_argument("--split", type=str, default="test", choices=["train", "val", "test"])
+    parser.add_argument(
+        "--dataset-split", type=str, default="test", choices=["train", "val", "test"]
+    )
+    parser.add_argument("--split-lidar", action="store_true")
+    parser.add_argument("--min-num-pts", type=int, default=-1)
     parser.add_argument("--bbox-classes", nargs="+", type=int, default=None)
     parser.add_argument("--bbox-score", type=float, default=None)
     parser.add_argument("--out-dir", type=str, default="vis_output")
@@ -50,11 +54,18 @@ def main():
 
     # build the dataloader
     if not args.only_bad_cases:
-        dataset = build_dataset(cfg.data[args.split])
+        dataset = build_dataset(cfg.data[args.dataset_split])
     else:
+        # intersection_files = np.load("lidar_intersection.npy", allow_pickle=True)
+        # intersection_files = [
+        #     b[1].replace("/", "_").replace("annotation_", "data_").replace(".json", ".npy")
+        #     for b in intersection_files.tolist()
+        # ]
         bad_cases = np.load("bad_cases.npy", allow_pickle=True)
         bad_cases = [b[3] for b in bad_cases.tolist()]
-        dataset = build_dataset(cfg.data[args.split], default_args=dict(only_bad_cases=bad_cases))
+        dataset = build_dataset(
+            cfg.data[args.dataset_split], default_args=dict(customized_files=bad_cases)
+        )
     data_loader = build_dataloader(
         dataset,
         samples_per_gpu=1,
@@ -80,7 +91,8 @@ def main():
             metas = data["img_metas"][0].data[0][0]  # val/test split
         else:
             metas = data["img_metas"].data[0][0]  # train split
-        name = metas["sample_idx"]
+        # hard-code way to simplify sample_idx
+        name = metas["sample_idx"].replace("data_xdq_data_", "")
         ann_info = metas["ann_info"]
         nid = metas["nid"]
         norm_offset = cfg.norm_offsets[nid]
@@ -92,6 +104,13 @@ def main():
         if args.mode == "gt" and "gt_bboxes_3d" in ann_info:
             bboxes = ann_info["gt_bboxes_3d"].tensor.numpy()
             labels = ann_info["gt_labels_3d"]
+            num_pts = np.array(ann_info["gt_num_pts"])
+            scores = None
+
+            if args.min_num_pts > 0:
+                indices = num_pts >= args.min_num_pts
+                bboxes = bboxes[indices]
+                labels = labels[indices]
 
             if args.bbox_classes is not None:
                 indices = np.isin(labels, args.bbox_classes)
@@ -103,15 +122,28 @@ def main():
             bboxes = outputs["boxes_3d"].tensor.numpy()
             scores = outputs["scores_3d"].numpy()
             labels = outputs["labels_3d"].numpy()
+            has_num_pts = "num_pts_3d" in outputs
+            if has_num_pts:
+                num_pts = np.array(outputs["num_pts_3d"])
 
             if args.bbox_classes is not None:
                 indices = np.isin(labels, args.bbox_classes)
                 bboxes = bboxes[indices]
                 scores = scores[indices]
                 labels = labels[indices]
+                if has_num_pts:
+                    num_pts = num_pts[indices]
 
             if args.bbox_score is not None:
                 indices = scores >= args.bbox_score
+                bboxes = bboxes[indices]
+                scores = scores[indices]
+                labels = labels[indices]
+                if has_num_pts:
+                    num_pts = num_pts[indices]
+
+            if args.min_num_pts > 0:
+                indices = num_pts >= args.min_num_pts
                 bboxes = bboxes[indices]
                 scores = scores[indices]
                 labels = labels[indices]
@@ -133,26 +165,69 @@ def main():
                     image,
                     bboxes=bboxes,
                     labels=labels,
+                    scores=scores,
                     transform=metas["lidar2img"][k],
                     classes=cfg.class_names,
                 )
 
         if "points" in data:
-            if isinstance(data["points"], list):
-                lidar_points = data["points"][0].data[0][0].numpy()  # val/test split
+            if args.split_lidar:
+                all_points = []
+                for i, points in enumerate(data["points"][0]):
+                    lidar_points = points.data[0][0].numpy()
+                    all_points.append(lidar_points)
+                    lidar_boxes = outputs["lidar_boxes"][i].tensor.numpy()
+                    lidar_scores = outputs["lidar_scores"][i].numpy()
+                    lidar_labels = outputs["lidar_labels"][i].numpy()
+
+                    if args.bbox_score is not None:
+                        indices = lidar_scores >= args.bbox_score
+                        lidar_boxes = lidar_boxes[indices]
+                        lidar_scores = lidar_scores[indices]
+                        lidar_labels = lidar_labels[indices]
+
+                    if lidar_boxes.shape[0] == 0:
+                        continue
+                    lidar_boxes = LiDARInstance3DBoxes(lidar_boxes, box_dim=9)
+
+                    lidar_boxes.tensor[:, :3] -= torch.Tensor(norm_offset)
+                    lidar_points -= norm_offset + [0.0]
+
+                    visualize_lidar(
+                        os.path.join(args.out_dir, f"lidar-{i}/{name}.png"),
+                        lidar_points,
+                        bboxes=lidar_boxes,
+                        labels=lidar_labels,
+                        xlim=[cfg.point_cloud_range[d] for d in [0, 3]],
+                        ylim=[cfg.point_cloud_range[d] for d in [1, 4]],
+                        classes=cfg.class_names,
+                    )
+                all_points = np.vstack(all_points)
+                visualize_lidar(
+                    os.path.join(args.out_dir, f"lidar/{name}.png"),
+                    all_points,
+                    bboxes=bboxes,
+                    labels=labels,
+                    xlim=[cfg.point_cloud_range[d] for d in [0, 3]],
+                    ylim=[cfg.point_cloud_range[d] for d in [1, 4]],
+                    classes=cfg.class_names,
+                )
             else:
-                lidar_points = data["points"].data[0][0].numpy()  # train split
-            # Unnormalize lidar points coordinates
-            lidar_points -= norm_offset + [0.0]
-            visualize_lidar(
-                os.path.join(args.out_dir, "lidar", f"{name}.png"),
-                lidar_points,
-                bboxes=bboxes,
-                labels=labels,
-                xlim=[cfg.point_cloud_range[d] for d in [0, 3]],
-                ylim=[cfg.point_cloud_range[d] for d in [1, 4]],
-                classes=cfg.class_names,
-            )
+                if isinstance(data["points"], list):
+                    lidar_points = data["points"][0].data[0][0].numpy()  # val/test split
+                else:
+                    lidar_points = data["points"].data[0][0].numpy()  # train split
+                # Unnormalize lidar points coordinates
+                lidar_points -= norm_offset + [0.0]
+                visualize_lidar(
+                    os.path.join(args.out_dir, "lidar", f"{name}.png"),
+                    lidar_points,
+                    bboxes=bboxes,
+                    labels=labels,
+                    xlim=[cfg.point_cloud_range[d] for d in [0, 3]],
+                    ylim=[cfg.point_cloud_range[d] for d in [1, 4]],
+                    classes=cfg.class_names,
+                )
 
 
 if __name__ == "__main__":

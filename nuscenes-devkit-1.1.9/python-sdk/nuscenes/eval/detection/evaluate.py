@@ -123,7 +123,7 @@ class DetectionEval:
         self.sample_tokens = self.gt_boxes.sample_tokens
 
     def evaluate(
-        self, conf_th=0.3, return_bad_cases=False
+        self, save_bad_cases_num=0, conf_th=0.3, dist_th=2.0
     ) -> Tuple[DetectionMetrics, DetectionMetricDataList]:
         """
         Performs the actual evaluation.
@@ -155,7 +155,7 @@ class DetectionEval:
                     )
 
         bad_cases = []
-        if return_bad_cases:
+        if save_bad_cases_num > 0:
             f1_res = []
             for sample_token in self.sample_tokens:
                 f1, p, r = accumulate_by_sample(
@@ -163,12 +163,11 @@ class DetectionEval:
                     self.pred_boxes,
                     sample_token,
                     self.cfg.dist_fcn_callable,
-                    dist_th=2.0,
-                    conf_th=conf_th,
+                    dist_th,
+                    conf_th,
                 )
                 f1_res.append((f1, p, r, sample_token))
-            # return the worst 30 samples
-            bad_cases = sorted(f1_res)[:30]
+            bad_cases = sorted(f1_res)[:save_bad_cases_num]
 
         # -----------------------------------
         # Step 2: Calculate metrics from the data.
@@ -257,8 +256,9 @@ class DetectionEval:
         self,
         plot_examples: int = 0,
         render_curves: bool = True,
+        save_bad_cases_num: int = 0,
         conf_th: float = 0.3,
-        return_bad_cases: bool = False,
+        dist_th: float = 2.0,
     ) -> Dict[str, Any]:
         """
         Main function that loads the evaluation code, visualizes samples, runs the evaluation and renders stat plots.
@@ -290,7 +290,7 @@ class DetectionEval:
 
         # Run evaluation.
         metrics, metric_data_list, bad_cases = self.evaluate(
-            conf_th=conf_th, return_bad_cases=return_bad_cases
+            save_bad_cases_num=save_bad_cases_num, conf_th=conf_th, dist_th=dist_th
         )
 
         # Render PR and TP curves.
