@@ -1,13 +1,15 @@
+import os
+import re
 import mmcv
 import numpy as np
 import torch
+from glob import glob
 
 from mmdet3d.core.points import BasePoints, get_points_type, LiDARPoints
 from mmdet3d.core.visualizer.image_vis import project_pts_on_img, map_pointcloud_to_image
 from mmdet3d.core.utils.gaussian import generate_guassian_depth_target
 from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines import LoadAnnotations
-import os
 
 
 @PIPELINES.register_module()
@@ -450,6 +452,7 @@ class LoadMultiViewImageFromFiles(object):
         cam_depth_range=[4.0, 45.0, 1.0],
         constant_std=0.5,
         norm_offsets=None,
+        map_depth_dir=None,
     ):
         self.to_float32 = to_float32
         self.img_scale = img_scale
@@ -458,6 +461,22 @@ class LoadMultiViewImageFromFiles(object):
         self.cam_depth_range = cam_depth_range
         self.constant_std = constant_std
         self.norm_offsets = norm_offsets
+        self.map_depth = None
+        if map_depth_dir is not None:
+            print(">>> Loading map depth......")
+            self.map_depth = {}
+            for timestamp in os.listdir(map_depth_dir):
+                ts_depth = {}
+                ts_dir = os.path.join(map_depth_dir, timestamp)
+                for nid in os.listdir(ts_dir):
+                    nid_depth = {}
+                    nid_dir = os.path.join(ts_dir, nid)
+                    for cid_depth_file in glob(os.path.join(nid_dir, "*.npy")):
+                        cid = os.path.basename(cid_depth_file).replace(".npy", "")
+                        nid_depth[cid] = np.load(cid_depth_file)
+                    ts_depth[nid] = nid_depth
+                self.map_depth[timestamp] = ts_depth
+            print(">>> Done")
 
     def pad(self, img):
         # to pad the 5 input images into a same size (for Waymo)
@@ -519,6 +538,15 @@ class LoadMultiViewImageFromFiles(object):
                 norm_offset = self.norm_offsets[nid]
                 points[:, :3] -= norm_offset
             for i in range(len(results["img"])):
+                if self.map_depth is not None:
+                    img_path = results["img_filename"][i]
+                    res = re.search("([^/?]+)/([^/?]+)/([^/?]+)-[^/?]+.jpg", img_path)
+                    timestamp, nid, kid = res.group(1), res.group(2), res.group(3)
+                    cid = f"{nid}-{kid}"
+                    map_depth = self.map_depth[timestamp][nid][cid]
+                else:
+                    map_depth = None
+
                 # project_pts_on_img(results['points'].tensor.numpy(), results['img'][i], results['lidar2img'][i])
                 depth = map_pointcloud_to_image(
                     points,
@@ -533,6 +561,7 @@ class LoadMultiViewImageFromFiles(object):
                     stride=8,
                     cam_depth_range=self.cam_depth_range,
                     constant_std=self.constant_std,
+                    map_depth=map_depth,
                 )
                 # import matplotlib.pyplot as plt
                 # h, w = min_depth.shape[1:]
@@ -736,7 +765,9 @@ class LoadPointsFromMultiSweeps(object):
                 elif self.test_mode:
                     choices = np.arange(self.sweeps_num)
                 else:
-                    choices = np.random.choice(len(results["sweeps"]), self.sweeps_num, replace=False)
+                    choices = np.random.choice(
+                        len(results["sweeps"]), self.sweeps_num, replace=False
+                    )
                 for idx in choices:
                     sweep = results["sweeps"][idx]
                     points_sweep = self._load_points(sweep["data_path"])
@@ -1045,7 +1076,7 @@ class LoadPointsFromFile(object):
         self.file_client_args = file_client_args.copy()
         self.file_client = None
 
-    def _load_points(self, pts_filename):
+    def _load_points(self, pts_filename, allow_non_exists=False):
         """Private function to load point clouds data.
 
         Args:
@@ -1055,7 +1086,12 @@ class LoadPointsFromFile(object):
             np.ndarray: An array containing point clouds data.
         """
         if pts_filename.endswith(".npy"):
-            return np.load(pts_filename)
+            if os.path.exists(pts_filename):
+                return np.load(pts_filename)
+            elif allow_non_exists:
+                return np.zeros((0, 4))
+            else:
+                raise FileNotFoundError(pts_filename)
         if self.file_client is None:
             self.file_client = mmcv.FileClient(**self.file_client_args)
         try:

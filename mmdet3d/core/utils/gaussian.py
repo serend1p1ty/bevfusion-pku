@@ -86,7 +86,9 @@ def gaussian_radius(det_size, min_overlap=0.5):
     return min(r1, r2, r3)
 
 
-def generate_guassian_depth_target(depth, stride, cam_depth_range, constant_std=None):
+def generate_guassian_depth_target(
+    depth, stride, cam_depth_range, constant_std=None, map_depth=None
+):
     # [1, 900, 1600]
     B, tH, tW = depth.shape
     # 8
@@ -119,6 +121,12 @@ def generate_guassian_depth_target(depth, stride, cam_depth_range, constant_std=
     unfold_depth[~valid_mask] = 1e10
     min_depth = torch.min(unfold_depth, dim=-1)[0]  # BN, H, W
     min_depth[min_depth == 1e10] = 0
+
+    if map_depth is not None:
+        idxs = min_depth != 0
+        map_depth = torch.Tensor(map_depth.copy())
+        map_depth[idxs] = min_depth[idxs]
+        min_depth = map_depth
 
     x = torch.arange(cam_depth_range[0], cam_depth_range[1] + 1, cam_depth_range[2])
     dist = Normal(min_depth / cam_depth_range[2], std_var / cam_depth_range[2])  # BN, H, W, D

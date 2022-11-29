@@ -1,5 +1,24 @@
 #### modified ####
 point_cloud_range = [-160, -160, -6, 160, 160, 4]
+#### modified ####
+# XDQ point cloud has been normalized offline, and stored in disk (*_norm.npy)
+# The variable is used to normalize image LSS point cloud online and
+# unnormalize prediction result.
+norm_offsets = {
+    "1": [22, -70, 45.75],
+    "2": [-23.32, 35.89, 45.75],
+    "3": [-25, 98, 45.34],
+    "7": [-65, -31, 45.19],
+    "12": [290, -120, 45.99],
+    "16": [-50, 62, 46.91],
+    "17": [8, -8, 45.41],
+    "19": [39, -68, 46.21],
+    "21": [19, 73, 45.6],
+    "32": [55, 12, 45.93],
+    "33": [-75, 1, 45.97],
+    "34": [-9, -5, 45.71],
+    "35": [55, 55, 46.03],
+}
 class_names = [
     "car",
     "truck",
@@ -36,7 +55,13 @@ train_pipeline = [
         sweeps_num=sweeps_num,
     ),
     dict(type="LoadAnnotations3D", with_bbox_3d=True, with_label_3d=True),
-    dict(type="LoadMultiViewImageFromFiles"),
+    dict(
+        type="LoadMultiViewImageFromFiles",
+        project_pts_to_img_depth=True,
+        cam_depth_range=[20.0, 90.0, 1.0],
+        norm_offsets=norm_offsets,
+        map_depth_dir="data/xdq/map_depths",
+    ),
     dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
     dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),
     dict(type="ObjectNameFilter", classes=class_names),
@@ -78,15 +103,16 @@ data = dict(
     workers_per_gpu=6,
     train=dict(
         type=dataset_type,
+        # Map-cam projection is incorrect: 20220922#35, 20221024#3, 20221026#3
         timestamps=[
             "20220825",
             "20220921#2",
-            "20220922",
+            "20220922#3/32/33/34",
             "20220930#3/12/32",
             "20221016",
             "20221018#1/16/19/21",
-            "20221024#3/7",
-            "20221026",
+            "20221024#7",
+            "20221026#19",
         ],
         data_root=data_root,
         pipeline=train_pipeline,
@@ -95,7 +121,7 @@ data = dict(
         test_mode=False,
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
-        with_hard_boxes=True,
+        with_hard_boxes=False,
     ),
     val=dict(
         type=dataset_type,
@@ -112,7 +138,7 @@ data = dict(
         test_mode=True,
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
-        with_hard_boxes=True,
+        with_hard_boxes=False,
     ),
     test=dict(
         type=dataset_type,
@@ -129,6 +155,6 @@ data = dict(
         test_mode=True,
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
-        with_hard_boxes=True,
+        with_hard_boxes=False,
     ),
 )

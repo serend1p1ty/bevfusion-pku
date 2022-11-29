@@ -167,6 +167,19 @@ def main():
         metas = data["img_metas"][0].data[0][0]
         name = metas["sample_idx"]
         nid = metas["nid"]
+        if nid not in cfg.norm_offsets:
+            if not args.vis:
+                anno_dict = {"pre_anno": {"bboxes": [], "labels": []}}
+                save_path = (
+                    os.path.join(args.out_dir, "/".join(metas["pts_filename"].split("/")[3:]))
+                    .replace("_norm.npy", ".json")
+                    .replace("longmao/", "")
+                )
+                save_dir = os.path.dirname(save_path)
+                os.makedirs(save_dir, exist_ok=True)
+                json.dump(anno_dict, open(save_path, "w"), indent=4, ensure_ascii=False)
+            continue
+
         norm_offset = cfg.norm_offsets[nid]
 
         with torch.inference_mode():
@@ -174,10 +187,30 @@ def main():
 
         if not args.vis:
             if outputs["boxes_3d"].tensor.shape[0] == 0:
+                anno_dict = {"pre_anno": {"bboxes": [], "labels": []}}
+                save_path = (
+                    os.path.join(args.out_dir, "/".join(metas["pts_filename"].split("/")[3:]))
+                    .replace("_norm.npy", ".json")
+                    .replace("longmao/", "")
+                )
+                save_dir = os.path.dirname(save_path)
+                os.makedirs(save_dir, exist_ok=True)
+                json.dump(anno_dict, open(save_path, "w"), indent=4, ensure_ascii=False)
                 continue
+
+            boxes = outputs["boxes_3d"]
+            centers = boxes.gravity_center
+            xs, ys, zs = centers[:, 0], centers[:, 1], centers[:, 2]
+            ws = boxes.tensor[:, 3]
+            ls = boxes.tensor[:, 4]
+            hs = boxes.tensor[:, 5]
+            yaws = boxes.tensor[:, 6]
+            boxes_list = []
+            for x, y, z, w, l, h, yaw in zip(xs, ys, zs, ws, ls, hs, yaws):
+                boxes_list.append({"x": x, "y": y, "z": z, "w": w, "l": l, "h": h, "yaw": yaw})
             anno_dict = {
                 "pre_anno": {
-                    "bboxes": (outputs["boxes_3d"].corners - torch.Tensor(norm_offset)).tolist(),
+                    "bboxes": boxes_list,
                     "labels": [
                         cls_mapper[XdqDataset.CLASSES[label_idx]]
                         for label_idx in outputs["labels_3d"]

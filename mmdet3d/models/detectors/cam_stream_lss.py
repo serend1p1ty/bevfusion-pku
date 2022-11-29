@@ -347,16 +347,8 @@ class LiftSplatShoot(nn.Module):
         geom = self.get_geometry(rots, trans, post_rots, post_trans, nid)
         x, depth = self.get_cam_feats(x)
         # import matplotlib.pyplot as plt
-        # dep = depth[0][0].max(dim=0)[1]
-        # h, w = dep.shape
-        # pts, colors = [], []
-        # for i in range(h):
-        #     for j in range(w):
-        #         pts.append([j, h - i])
-        #         colors.append(dep[i][j])
-        # pts = np.array(pts)
-        # plt.scatter(pts[:, 0], pts[:, 1], c=colors, s=1)
-        # plt.savefig("depth.png")
+        # dep = depth[0][0].max(dim=0)[1].cpu().numpy()
+        # plt.imsave("depth.png", dep)
         x = self.voxel_pooling(geom, x)
         return x, depth
 

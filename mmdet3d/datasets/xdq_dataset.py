@@ -742,7 +742,10 @@ def output_to_nusc_box(detection):
     box3d = detection["boxes_3d"]
     scores = detection["scores_3d"].numpy()
     labels = detection["labels_3d"].numpy()
-    num_pts = detection["num_pts_3d"]
+    if "num_pts_3d" in detection:
+        num_pts = detection["num_pts_3d"]
+    else:
+        num_pts = [-1 for _ in range(scores.shape[0])]
 
     box_gravity_center = box3d.gravity_center.numpy()
     box_dims = box3d.dims.numpy()
