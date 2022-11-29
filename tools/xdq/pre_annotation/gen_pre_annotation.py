@@ -167,16 +167,19 @@ def main():
         metas = data["img_metas"][0].data[0][0]
         name = metas["sample_idx"]
         nid = metas["nid"]
+
+        if not args.vis:
+            save_path = (
+                os.path.join(args.out_dir, "/".join(metas["pts_filename"].split("/")[3:]))
+                .replace("_norm.npy", ".json")
+                .replace("longmao/", "")
+            )
+            save_dir = os.path.dirname(save_path)
+            os.makedirs(save_dir, exist_ok=True)
+
         if nid not in cfg.norm_offsets:
             if not args.vis:
                 anno_dict = {"pre_anno": {"bboxes": [], "labels": []}}
-                save_path = (
-                    os.path.join(args.out_dir, "/".join(metas["pts_filename"].split("/")[3:]))
-                    .replace("_norm.npy", ".json")
-                    .replace("longmao/", "")
-                )
-                save_dir = os.path.dirname(save_path)
-                os.makedirs(save_dir, exist_ok=True)
                 json.dump(anno_dict, open(save_path, "w"), indent=4, ensure_ascii=False)
             continue
 
@@ -188,17 +191,12 @@ def main():
         if not args.vis:
             if outputs["boxes_3d"].tensor.shape[0] == 0:
                 anno_dict = {"pre_anno": {"bboxes": [], "labels": []}}
-                save_path = (
-                    os.path.join(args.out_dir, "/".join(metas["pts_filename"].split("/")[3:]))
-                    .replace("_norm.npy", ".json")
-                    .replace("longmao/", "")
-                )
-                save_dir = os.path.dirname(save_path)
-                os.makedirs(save_dir, exist_ok=True)
                 json.dump(anno_dict, open(save_path, "w"), indent=4, ensure_ascii=False)
                 continue
 
             boxes = outputs["boxes_3d"]
+            scores = outputs["scores_3d"]
+            labels = outputs["labels_3d"]
             centers = boxes.gravity_center
             xs, ys, zs = centers[:, 0], centers[:, 1], centers[:, 2]
             ws = boxes.tensor[:, 3]
@@ -206,27 +204,26 @@ def main():
             hs = boxes.tensor[:, 5]
             yaws = boxes.tensor[:, 6]
             boxes_list = []
-            for x, y, z, w, l, h, yaw in zip(xs, ys, zs, ws, ls, hs, yaws):
-                boxes_list.append({"x": x, "y": y, "z": z, "w": w, "l": l, "h": h, "yaw": yaw})
-            anno_dict = {
-                "pre_anno": {
-                    "bboxes": boxes_list,
-                    "labels": [
-                        cls_mapper[XdqDataset.CLASSES[label_idx]]
-                        for label_idx in outputs["labels_3d"]
-                    ],
-                }
-            }
-            save_path = (
-                os.path.join(args.out_dir, "/".join(metas["pts_filename"].split("/")[3:]))
-                .replace("_norm.npy", ".json")
-                .replace("longmao/", "")
-            )
-            save_dir = os.path.dirname(save_path)
-            os.makedirs(save_dir, exist_ok=True)
+            label_list = []
+            for x, y, z, w, l, h, yaw, score, label in zip(
+                xs, ys, zs, ws, ls, hs, yaws, scores, labels
+            ):
+                if args.bbox_score is not None and score < args.bbox_score:
+                    continue
+                boxes_list.append(
+                    {
+                        "x": x.item(),
+                        "y": y.item(),
+                        "z": z.item(),
+                        "w": w.item(),
+                        "l": l.item(),
+                        "h": h.item(),
+                        "yaw": yaw.item(),
+                    }
+                )
+                label_list.append(cls_mapper[XdqDataset.CLASSES[label]])
+            anno_dict = {"pre_anno": {"bboxes": boxes_list, "labels": label_list}}
             json.dump(anno_dict, open(save_path, "w"), indent=4, ensure_ascii=False)
-
-        if not args.vis:
             continue
 
         bboxes = outputs["boxes_3d"].tensor.numpy()
