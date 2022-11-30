@@ -67,6 +67,14 @@ class DefaultFormatBundle(object):
                 # print(results['img'].shape, 'notlist')
                 img = np.ascontiguousarray(results["img_depth"])
                 results["img_depth"] = DC(to_tensor(img), stack=False)
+        if "depth_lidar_idxs" in results:
+            if isinstance(results["depth_lidar_idxs"], list):
+                imgs = np.ascontiguousarray(np.stack(results["depth_lidar_idxs"], axis=0))
+                # 和"img"相同, 设置stack=False
+                results["depth_lidar_idxs"] = DC(to_tensor(imgs), stack=False)
+            else:
+                img = np.ascontiguousarray(results["depth_lidar_idxs"])
+                results["depth_lidar_idxs"] = DC(to_tensor(img), stack=False)
         for key in [
             "proposals",
             "gt_bboxes",

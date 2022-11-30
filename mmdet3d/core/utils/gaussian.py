@@ -122,10 +122,11 @@ def generate_guassian_depth_target(
     min_depth = torch.min(unfold_depth, dim=-1)[0]  # BN, H, W
     min_depth[min_depth == 1e10] = 0
 
+    lidar_idxs = None
     if map_depth is not None:
-        idxs = min_depth != 0
+        lidar_idxs = min_depth != 0
         map_depth = torch.Tensor(map_depth.copy())
-        map_depth[idxs] = min_depth[idxs]
+        map_depth[lidar_idxs] = min_depth[lidar_idxs]
         min_depth = map_depth
 
     x = torch.arange(cam_depth_range[0], cam_depth_range[1] + 1, cam_depth_range[2])
@@ -138,4 +139,4 @@ def generate_guassian_depth_target(
     cdfs = torch.stack(cdfs, dim=-1)
     # [1, 112, 200, 41]
     depth_dist = cdfs[..., 1:] - cdfs[..., :-1]
-    return depth_dist, min_depth, std_var
+    return depth_dist, min_depth, std_var, lidar_idxs

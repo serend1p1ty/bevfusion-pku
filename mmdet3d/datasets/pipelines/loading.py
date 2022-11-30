@@ -530,6 +530,7 @@ class LoadMultiViewImageFromFiles(object):
         if self.project_pts_to_img_depth:
             # results['img_fields'].append('img_depth')
             results["img_depth"] = []
+            # results["depth_lidar_idxs"] = []
             # must copy, or else results["points"].tensor will be influenced
             points = results["points"].tensor.numpy().copy()
             if "nid" in results:
@@ -556,25 +557,16 @@ class LoadMultiViewImageFromFiles(object):
                     results["caminfo"][i]["cam_intrinsic"],
                     show=False,
                 )
-                guassian_depth, min_depth, std_var = generate_guassian_depth_target(
+                guassian_depth, min_depth, std_var, lidar_idxs = generate_guassian_depth_target(
                     torch.from_numpy(depth).unsqueeze(0),
                     stride=8,
                     cam_depth_range=self.cam_depth_range,
                     constant_std=self.constant_std,
                     map_depth=map_depth,
                 )
-                # import matplotlib.pyplot as plt
-                # h, w = min_depth.shape[1:]
-                # pts, colors = [], []
-                # for i in range(h):
-                #     for j in range(w):
-                #         pts.append([j, h - i])
-                #         colors.append(min_depth[0][i][j])
-                # pts = np.array(pts)
-                # plt.scatter(pts[:, 0], pts[:, 1], c=colors, s=1)
-                # plt.savefig("depth.png")
                 depth = torch.cat([min_depth[0].unsqueeze(-1), guassian_depth[0]], dim=-1)
                 results["img_depth"].append(depth)
+                # results["depth_lidar_idxs"].append(lidar_idxs.squeeze())
         return results
 
     def __repr__(self):

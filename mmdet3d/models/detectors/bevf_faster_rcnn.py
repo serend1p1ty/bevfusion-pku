@@ -267,6 +267,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
         gt_bboxes=None,
         img=None,
         img_depth=None,
+        depth_lidar_idxs=None,
         proposals=None,
         gt_bboxes_ignore=None,
     ):
@@ -299,7 +300,11 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                 # img_depth (gt): [2, 6, 112, 200, 42]
                 loss_depth = (
                     self.depth_dist_loss(
-                        depth_dist, img_depth, loss_method=self.img_depth_loss_method, img=img
+                        depth_dist,
+                        img_depth,
+                        loss_method=self.img_depth_loss_method,
+                        img=img,
+                        depth_lidar_idxs=depth_lidar_idxs,
                     )
                     * self.img_depth_loss_weight
                 )
@@ -307,7 +312,9 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
             losses.update(losses_img)
         return losses
 
-    def depth_dist_loss(self, predict_depth_dists, gt_depths, loss_method="kld", img=None):
+    def depth_dist_loss(
+        self, predict_depth_dists, gt_depths, loss_method="kld", img=None, depth_lidar_idxs=None
+    ):
         loss = 0
         batch_size = len(gt_depths)
         for predict_depth_dist, gt_depth in zip(predict_depth_dists, gt_depths):
@@ -317,6 +324,12 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
             mask = (min_depth >= self.camera_depth_range[0]) & (
                 min_depth <= self.camera_depth_range[1]
             )
+            # import matplotlib.pyplot as plt
+            # plt.imsave("depth0.png", min_depth[0].cpu().numpy())
+            # plt.imsave("depth1.png", min_depth[1].cpu().numpy())
+            # min_deph[mask] = 255
+            # plt.imsave("depth0_valid.png", min_depth[0].cpu().numpy())
+            # plt.imsave("depth1_valid.png", min_depth[1].cpu().numpy())
             mask = mask.view(-1)
             guassian_depth = guassian_depth.view(-1, D)[mask]
             predict_depth_dist = predict_depth_dist.permute(0, 1, 3, 4, 2).reshape(-1, D)[mask]
