@@ -1,6 +1,6 @@
 #### modified ####
 point_cloud_range = [-160, -160, -6, 160, 160, 4]
-#### modified ####
+object_range = [-75, -75, -6, 75, 75, 4]
 # XDQ point cloud has been normalized offline, and stored in disk (*_norm.npy)
 # The variable is used to normalize image LSS point cloud online and
 # unnormalize prediction result.
@@ -19,6 +19,7 @@ norm_offsets = {
     "34": [-9, -5, 45.71],
     "35": [55, 55, 46.03],
 }
+##################
 class_names = [
     "car",
     "truck",
@@ -63,14 +64,14 @@ train_pipeline = [
         map_depth_dir="data/xdq/map_depths",
     ),
     dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
-    dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),
+    dict(type="ObjectRangeFilter", point_cloud_range=object_range),
     dict(type="ObjectNameFilter", classes=class_names),
     dict(type="PointShuffle"),
     dict(type="MyResize", img_scale=img_scale, keep_ratio=True),
     dict(type="MyNormalize", **img_norm_cfg),
     dict(type="MyPad", size_divisor=32),
     dict(type="DefaultFormatBundle3D", class_names=class_names),
-    dict(type="Collect3D", keys=["points", "img", "gt_bboxes_3d", "gt_labels_3d"]),
+    dict(type="Collect3D", keys=["points", "img", "img_depth", "gt_bboxes_3d", "gt_labels_3d"]),
 ]
 test_pipeline = [
     dict(

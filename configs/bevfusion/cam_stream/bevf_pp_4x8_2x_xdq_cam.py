@@ -153,7 +153,6 @@ data = dict(
 )
 
 load_img_from = "work_dirs/pre_mask_rcnn_dbswin-t_fpn_3x_nuim_cocopre/epoch_36.pth"
+# fp16 = dict(loss_scale=32.0)
 #### modified ####
-fp16 = dict(loss_scale=32.0)
 load_from = "work_dirs/pre_bevf_pp_4x8_2x_nusc_cam/new_epoch_24.pth"
-##################
