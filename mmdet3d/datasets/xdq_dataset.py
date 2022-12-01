@@ -48,17 +48,23 @@ def get_class_name_by_size_l(size_l):
         return "pedestrian"
 
 
-def load_gt_bboxes_info(info, with_unknown_boxes=False, with_hard_boxes=False):
+def load_gt_bboxes_info(info, with_unknown_boxes=False, with_hard_boxes=False, camz_range=None):
     _gt_bboxes = [corners2xyzwlhr(obj["3d_box"]) for obj in info["lidar_objs"]]
     _gt_names = [obj["type"] for obj in info["lidar_objs"]]
     _gt_num_pts = [obj["num_pts"] for obj in info["lidar_objs"]]
+    _gt_min_camzs = [obj["min_camz"] for obj in info["lidar_objs"]]
     gt_bboxes_3d, gt_names_3d, gt_num_pts_3d = [], [], []
-    for gt_bbox, gt_name, gt_num_pts in zip(_gt_bboxes, _gt_names, _gt_num_pts):
+    for gt_bbox, gt_name, gt_num_pts, gt_min_camz in zip(
+        _gt_bboxes, _gt_names, _gt_num_pts, _gt_min_camzs
+    ):
         # check if the box is valid
         if gt_name == "Unknown" and not with_unknown_boxes:
             continue
         if gt_num_pts < 5 and not with_hard_boxes:
             continue
+        if camz_range is not None:
+            if gt_min_camz < camz_range[0] or gt_min_camz > camz_range[1]:
+                continue
 
         # the box is valid
         gt_bboxes_3d.append(gt_bbox)
@@ -82,6 +88,7 @@ class XdqDetectionEval(DetectionEval):
         eval_set,
         with_unknown_boxes=False,
         with_hard_boxes=False,
+        camz_range=None,
         output_dir=None,
         verbose=True,
     ):
@@ -107,7 +114,9 @@ class XdqDetectionEval(DetectionEval):
         self.pred_boxes, self.meta = load_prediction(
             self.result_path, self.cfg.max_boxes_per_sample, DetectionBox, verbose=verbose
         )
-        self.gt_boxes = self.load_gt(data_infos, DetectionBox, with_unknown_boxes, with_hard_boxes)
+        self.gt_boxes = self.load_gt(
+            data_infos, DetectionBox, with_unknown_boxes, with_hard_boxes, camz_range
+        )
 
         assert set(self.pred_boxes.sample_tokens) == set(
             self.gt_boxes.sample_tokens
@@ -203,11 +212,13 @@ class XdqDetectionEval(DetectionEval):
         return eval_boxes
 
     @staticmethod
-    def load_gt(data_infos, box_cls, with_unknown_boxes=False, with_hard_boxes=False):
+    def load_gt(
+        data_infos, box_cls, with_unknown_boxes=False, with_hard_boxes=False, camz_range=None
+    ):
         all_annotations = EvalBoxes()
         for info in data_infos:
             gt_bboxes_3d, gt_names_3d, gt_num_pts_3d = load_gt_bboxes_info(
-                info, with_unknown_boxes, with_hard_boxes
+                info, with_unknown_boxes, with_hard_boxes, camz_range
             )
 
             sample_boxes = []
@@ -267,6 +278,7 @@ class XdqDataset(Custom3DDataset):
         test_mode=False,
         eval_version="detection_xdq_iou_dist",
         customized_files=None,
+        camz_range=None,
     ):
         self.timestamps = timestamps
         self.data_dir = osp.join(data_root, "data")
@@ -276,6 +288,7 @@ class XdqDataset(Custom3DDataset):
         if customized_files is not None:
             assert isinstance(customized_files, Iterable)
         self.customized_files = customized_files
+        self.camz_range = camz_range
 
         if modality is None:
             modality = dict(
@@ -369,7 +382,7 @@ class XdqDataset(Custom3DDataset):
         info = self.data_infos[index]
 
         gt_bboxes_3d, gt_names_3d, gt_num_pts_3d = load_gt_bboxes_info(
-            info, self.with_unknown_boxes, self.with_hard_boxes
+            info, self.with_unknown_boxes, self.with_hard_boxes, self.camz_range
         )
 
         zero_velocity = np.zeros((gt_bboxes_3d.shape[0], 2))
@@ -427,13 +440,21 @@ class XdqDataset(Custom3DDataset):
         for anno_file in anno_files:
             data_info = json.load(open(anno_file, "r"))
 
-            if not self.with_unknown_boxes or not self.with_hard_boxes:
+            if (
+                not self.with_unknown_boxes
+                or not self.with_hard_boxes
+                or self.camz_range is not None
+            ):
                 has_valid_box = False
                 for obj in data_info["lidar_objs"]:
                     if obj["type"] == "Unknown" and not self.with_unknown_boxes:
                         continue
                     if obj["num_pts"] < 5 and not self.with_hard_boxes:
                         continue
+                    if self.camz_range is not None:
+                        min_camz, max_camz = self.camz_range
+                        if obj["min_camz"] < min_camz or obj["min_camz"] > max_camz:
+                            continue
                     has_valid_box = True
                     break
                 if not has_valid_box:
@@ -564,6 +585,7 @@ class XdqDataset(Custom3DDataset):
             eval_set=eval_set_map[self.version],
             with_unknown_boxes=self.with_unknown_boxes,
             with_hard_boxes=self.with_hard_boxes,
+            camz_range=self.camz_range,
             output_dir=output_dir,
             verbose=True,
         )
