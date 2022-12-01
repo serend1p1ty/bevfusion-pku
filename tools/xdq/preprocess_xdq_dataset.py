@@ -3,6 +3,8 @@ import json
 import numpy as np
 import os
 import re
+import math
+import matplotlib.pyplot as plt
 from copy import deepcopy
 from glob import glob
 from tqdm import tqdm
@@ -217,11 +219,96 @@ def fix_cam_lidar_mismatch(fix=False):
                 json.dump(anno, f, indent=4)
 
 
+def attach_min_camz(plot=True, minz=20, maxz=90):
+    anno_files = glob(os.path.join(anno_dir, "*/*/*_norm.json"))
+    nid_set = set()
+    print("Attach min camz......")
+    for anno_file in tqdm(anno_files):
+        anno = json.load(open(anno_file))
+        nid_set.add(anno["nid"])
+        norm_offset = norm_offsets[anno["nid"]]
+        for i, obj in enumerate(anno["lidar_objs"]):
+            box_corners = np.asarray(obj["3d_box"], dtype=np.float64)
+            box_corners -= norm_offset
+            min_camz = 1e5
+            for camera_info in anno["cams"]:
+                intrinsic = np.float32(camera_info["intrinsic"])
+                extrinsic = np.float32(camera_info["extrinsic"])
+                l2c_R, l2c_t = extrinsic[:3, :3], extrinsic[:3, 3:]
+                # [3, 8]
+                cam_points = l2c_R @ box_corners.T + l2c_t
+
+                # check if the box is in the front of camera
+                _, _, camz = cam_points.mean(axis=1)
+                if camz <= 0:
+                    continue
+
+                # [8, 3]
+                img_points = (intrinsic @ cam_points).T
+                img_points[:, :2] /= img_points[:, 2:]
+
+                # check if the box is visible in image
+                h, w = 1080, 1920
+                min_x, min_y = img_points[:, :2].min(axis=0)
+                max_x, max_y = img_points[:, :2].min(axis=0)
+                if min_x >= w or max_x < 0 or min_y >= h or max_y < 0:
+                    continue
+
+                # import cv2
+                # img_relative_path = re.search(
+                #     "[^/?]+/[^/?]+/[^/?]+jpg", camera_info["img_path"]
+                # ).group()
+                # img_path = os.path.join(data_dir, img_relative_path)
+                # img = cv2.imread(img_path)
+                # for img_point in img_points:
+                #     img_point = img_point.astype(np.int)
+                #     cv2.circle(img, img_point[:2], 10, (0, 255, 255), -1)
+                # cv2.imwrite("test.png", img)
+                # input()
+
+                min_camz = min(min_camz, camz)
+            min_camz = -1 if min_camz == 1e5 else min_camz
+            anno["lidar_objs"][i]["min_camz"] = min_camz
+        with open(anno_file, "w") as f:
+            json.dump(anno, f, ensure_ascii=False, indent=4)
+
+    if not plot:
+        return
+
+    nid_cnt = len(nid_set)
+    print(f"Total nid num: {nid_cnt}")
+
+    cols = 3
+    rows = math.ceil(nid_cnt / cols)
+    fig, axs = plt.subplots(rows, cols, figsize=(9, 15))
+
+    for i, nid in enumerate(nid_set):
+        row_idx = i // cols
+        col_idx = i % cols
+        cnt = 0
+        print(f"Processing nid: {nid}...")
+        for anno_file in tqdm(anno_files):
+            anno = json.load(open(anno_file))
+            if anno["nid"] != nid:
+                continue
+            for obj in anno["lidar_objs"]:
+                if obj["min_camz"] < minz or obj["min_camz"] > maxz:
+                    continue
+                box = np.array(obj["3d_box"])
+                cnt += 1
+                center_x, center_y, _ = box.mean(axis=0)
+                axs[row_idx, col_idx].plot(center_x, center_y, "o", color="blue", markersize=0.1)
+        axs[row_idx, col_idx].set_title(f"nid {nid}: {cnt}")
+    fig.tight_layout()
+    fig.savefig("cam_train_bboxes.png")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cal-offset", action="store_true")
     parser.add_argument("--norm", action="store_true")
     parser.add_argument("--fix-mismatch", action="store_true")
+    parser.add_argument("--attach-min-camz", action="store_true")
     parser.add_argument("--dataset-dir", default="data/xdq")
     args = parser.parse_args()
 
@@ -239,3 +326,6 @@ if __name__ == "__main__":
     if args.fix_mismatch:
         fix_cam_lidar_mismatch()
         exit(0)
+
+    if args.attach_min_camz:
+        attach_min_camz()

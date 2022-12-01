@@ -32,7 +32,7 @@ norm_offsets = {
 def project_lidar(anno_files):
     num_files = len(anno_files)
     ncols = 3
-    nrows = math.ceil(num_files / 3)
+    nrows = math.ceil(num_files / ncols)
     fig, axs = plt.subplots(nrows, ncols, figsize=(20, 40), squeeze=False)
     for anno_id, anno_file in enumerate(tqdm(anno_files)):
         anno = json.load(open(anno_file))
