@@ -3,6 +3,7 @@ import mmcv
 import os
 import torch
 import warnings
+import numpy as np
 from mmcv import Config, DictAction
 from mmcv.cnn import fuse_conv_bn
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
@@ -178,12 +179,15 @@ def main():
 
     # build the dataloader
     dataset = build_dataset(cfg.data.test)
+    shuffle=False
+    if shuffle:
+        dataset.flag = np.zeros(len(dataset), dtype=np.uint8)
     data_loader = build_dataloader(
         dataset,
         samples_per_gpu=samples_per_gpu,
         workers_per_gpu=cfg.data.workers_per_gpu,
         dist=distributed,
-        shuffle=False,
+        shuffle=shuffle,
     )
 
     # build the model and load checkpoint

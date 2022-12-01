@@ -66,12 +66,15 @@ def main():
         dataset = build_dataset(
             cfg.data[args.dataset_split], default_args=dict(customized_files=bad_cases)
         )
+    shuffle = True
+    if shuffle:
+        dataset.flag = np.zeros(len(dataset), dtype=np.uint8)
     data_loader = build_dataloader(
         dataset,
         samples_per_gpu=1,
         workers_per_gpu=cfg.data.workers_per_gpu,
         dist=distributed,
-        shuffle=False,
+        shuffle=shuffle,
     )
 
     # build the model and load checkpoint
