@@ -194,7 +194,9 @@ def main():
                 json.dump(anno_dict, open(save_path, "w"), indent=4, ensure_ascii=False)
                 continue
 
-            boxes = outputs["boxes_3d"]
+            boxes = outputs["boxes_3d"].tensor.numpy()
+            boxes[:, :3] -= norm_offset
+            boxes = LiDARInstance3DBoxes(boxes, box_dim=9)
             scores = outputs["scores_3d"]
             labels = outputs["labels_3d"]
             centers = boxes.gravity_center

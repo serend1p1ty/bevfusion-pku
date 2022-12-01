@@ -297,26 +297,30 @@ def main():
         ckpt = state_dict
         new_ckpt = OrderedDict()
         for k, v in ckpt.items():
-            if k.startswith("pts_bbox_head") or k in [
-                "lift_splat_shot_vis.dx",
-                "lift_splat_shot_vis.bx",
-                "lift_splat_shot_vis.nx",
-                "lift_splat_shot_vis.frustum",
-                "lift_splat_shot_vis.camencode.depthnet.weight",
-                "lift_splat_shot_vis.camencode.depthnet.bias",
-                "lift_splat_shot_vis.bevencode.0.weight",
-                "lift_splat_shot_vis.bevencode.1.weight",
-                "lift_splat_shot_vis.bevencode.1.bias",
-                "lift_splat_shot_vis.bevencode.1.running_mean",
-                "lift_splat_shot_vis.bevencode.1.running_var",
-                "lift_splat_shot_vis.bevencode.3.weight",
-            ]:
+            # load the LSS model trained on nuScenes
+            # if k.startswith("pts_bbox_head") or k in [
+            #     "lift_splat_shot_vis.dx",
+            #     "lift_splat_shot_vis.bx",
+            #     "lift_splat_shot_vis.nx",
+            #     "lift_splat_shot_vis.frustum",
+            #     "lift_splat_shot_vis.camencode.depthnet.weight",
+            #     "lift_splat_shot_vis.camencode.depthnet.bias",
+            #     "lift_splat_shot_vis.bevencode.0.weight",
+            #     "lift_splat_shot_vis.bevencode.1.weight",
+            #     "lift_splat_shot_vis.bevencode.1.bias",
+            #     "lift_splat_shot_vis.bevencode.1.running_mean",
+            #     "lift_splat_shot_vis.bevencode.1.running_var",
+            #     "lift_splat_shot_vis.bevencode.3.weight",
+            # ]:
+            #     continue
+            if k.startswith('pts_bbox_head'):
                 continue
             else:
                 new_v = v
                 new_k = k
             new_ckpt[new_k] = new_v
-        model.load_state_dict(new_ckpt, strict=False)
+        msg = model.load_state_dict(new_ckpt, strict=False)
+        print(f">>> LSS model loading detail: {msg}")
 
     train_detector(
         model,

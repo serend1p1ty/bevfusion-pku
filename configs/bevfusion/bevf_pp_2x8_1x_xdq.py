@@ -191,9 +191,9 @@ optimizer = dict(
     ),
 )
 
-load_lift_from = "work_dirs/pre_bevf_pp_4x8_2x_nusc_cam/epoch_24.pth"  #####load cam stream
+load_lift_from = "work_dirs/bevf_pp_4x8_2x_xdq_cam/latest.pth"  #####load cam stream
 load_from = (
-    "work_dirs/hv_pointpillars_secfpn_sbn-all_4x8_2x_xdq-3d-v3/epoch_24.pth"  #####load lidar stream
+    "work_dirs/lidar-v3-hand_craft/epoch_24.pth"  #####load lidar stream
 )
 model_parallelism = True
 #### modified ####
