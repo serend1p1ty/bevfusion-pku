@@ -198,8 +198,5 @@ load_from = (
 model_parallelism = True
 #### modified ####
 freeze_lidar_components = True
-lr_config = dict(
-    policy="step", warmup="linear", warmup_iters=1000, warmup_ratio=1.0 / 1000, step=[6, 8]
-)
-total_epochs = 9
+freeze_image_components = True
 ##################

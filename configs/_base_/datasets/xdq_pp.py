@@ -102,15 +102,16 @@ data = dict(
     workers_per_gpu=6,
     train=dict(
         type=dataset_type,
+        # Map-cam projection is incorrect: 20220922#35, 20221024#3, 20221026#3
         timestamps=[
             "20220825",
             "20220921#2",
-            "20220922",
+            "20220922#3/32/33/34",
             "20220930#3/12/32",
             "20221016",
             "20221018#1/16/19/21",
-            "20221024#3/7",
-            "20221026",
+            "20221024#7",
+            "20221026#19",
         ],
         data_root=data_root,
         pipeline=train_pipeline,

@@ -499,6 +499,7 @@ class XdqDataset(Custom3DDataset):
         save_bad_cases_num=0,
         conf_th=0.3,
         dist_th=2.0,
+        logger=None,
     ):
         """Evaluation in nuScenes protocol.
 

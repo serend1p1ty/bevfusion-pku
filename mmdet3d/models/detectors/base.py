@@ -1,9 +1,11 @@
+import os
 import mmcv
 import torch
 from mmcv.parallel import DataContainer as DC
 from mmcv.runner import auto_fp16
 from os import path as osp
 
+from mmcv.parallel.scatter_gather import scatter_kwargs
 from mmdet3d.core import Box3DMode, Coord3DMode, show_result
 from mmdet.models.detectors import BaseDetector
 
@@ -11,7 +13,16 @@ from mmdet.models.detectors import BaseDetector
 class Base3DDetector(BaseDetector):
     """Base class for detectors."""
 
-    def forward_test(self, points, img_metas, img=None, **kwargs):
+    def forward_test(self, *args, **kwargs):
+        if "MODEL_PARALLELISM" in os.environ:
+            device2 = int(os.environ["DEVICE_ID2"])
+            # unpack mmcv DataContainer
+            args, kwargs = scatter_kwargs(args, kwargs, [device2], dim=0)
+            return self._forward_test(*args[0], **kwargs[0])
+        else:
+            return self._forward_test(*args, **kwargs)
+
+    def _forward_test(self, points, img_metas, img=None, **kwargs):
         """
         Args:
             points (list[torch.Tensor]): the outer list indicates test-time

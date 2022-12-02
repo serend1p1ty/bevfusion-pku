@@ -189,11 +189,20 @@ def main():
     #     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
     #     print('Convert to SyncBatchNorm')
 
-    if "freeze_lidar_components" in cfg and cfg["freeze_lidar_components"] is True:
-        logger.info(f"param need to update:")
-        param_grad = []
-        param_nograd = []
+    fix = False
 
+    if "freeze_image_components" in cfg and cfg["freeze_image_components"] is True:
+        fix = True
+        logger.info("Freeze image components")
+        fix_modules = ["img_backbone", "img_neck", "lift_splat_shot_vis"]
+        for name, param in model.named_parameters():
+            for module_name in fix_modules:
+                if module_name in name:
+                    param.requires_grad = False
+                    break
+
+    if "freeze_lidar_components" in cfg and cfg["freeze_lidar_components"] is True:
+        fix = True
         for name, param in model.named_parameters():
             if "pts" in name and "pts_bbox_head" not in name:
                 param.requires_grad = False
@@ -217,25 +226,25 @@ def main():
             if isinstance(m, nn.BatchNorm1d) or isinstance(m, nn.BatchNorm2d):
                 m.track_running_stats = False
 
+        logger.info("Freeze lidar backbone")
         model.pts_voxel_layer.apply(fix_bn)
         model.pts_voxel_encoder.apply(fix_bn)
         model.pts_middle_encoder.apply(fix_bn)
         model.pts_backbone.apply(fix_bn)
         model.pts_neck.apply(fix_bn)
-        print("freeze lidar backbone")
         if "TransFusion" in cfg.model.type and ("no_freeze_head" not in cfg):
-            print("freez head")
+            logger.info("Freeze head")
             model.pts_bbox_head.heatmap_head.apply(fix_bn)
             model.pts_bbox_head.shared_conv.apply(fix_bn)
             model.pts_bbox_head.class_encoding.apply(fix_bn)
             model.pts_bbox_head.decoder[0].apply(fix_bn)
             model.pts_bbox_head.prediction_heads[0].apply(fix_bn)
+
+    if fix:
+        logger.info(f"Param need to update:")
         for name, param in model.named_parameters():
             if param.requires_grad is True:
                 logger.info(name)
-                param_grad.append(name)
-            else:
-                param_nograd.append(name)
 
     logger.info(f"Model:\n{model}")
     datasets = [build_dataset(cfg.data.train)]
@@ -261,7 +270,7 @@ def main():
     model.CLASSES = datasets[0].CLASSES
 
     if "load_img_from" in cfg:
-        print(cfg.load_img_from)
+        logger.info(f"Loading image model from {cfg.load_img_from}")
         checkpoint = torch.load(cfg.load_img_from, map_location="cpu")
         if "state_dict" in checkpoint:
             state_dict = checkpoint["state_dict"]
@@ -283,10 +292,11 @@ def main():
             else:
                 continue
             new_ckpt[new_k] = new_v
-        model.load_state_dict(new_ckpt, strict=False)
+        msg = model.load_state_dict(new_ckpt, strict=False)
+        logger.info(f"Loading details: {msg}")
 
     if "load_lift_from" in cfg:
-        print(cfg.load_lift_from)
+        logger.info(f"Loading LSS model from {cfg.load_lift_from}")
         checkpoint = torch.load(cfg.load_lift_from, map_location="cpu")
         if "state_dict" in checkpoint:
             state_dict = checkpoint["state_dict"]
@@ -320,7 +330,7 @@ def main():
                 new_k = k
             new_ckpt[new_k] = new_v
         msg = model.load_state_dict(new_ckpt, strict=False)
-        print(f">>> LSS model loading detail: {msg}")
+        logger.info(f"Loading details: {msg}")
 
     train_detector(
         model,
