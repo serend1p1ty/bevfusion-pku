@@ -92,13 +92,13 @@ def parse_args():
         "--conf-th",
         type=float,
         default=0.3,
-        help="The confidence threshold is used to filter predictions."
+        help="The confidence threshold is used to filter predictions.",
     )
     parser.add_argument(
         "--dist-th",
         type=float,
         default=2.0,
-        help="The distance threshold is used to determine if one prediction is TP or FP."
+        help="The distance threshold is used to determine if one prediction is TP or FP.",
     )
     parser.add_argument(
         "--launcher",
@@ -179,7 +179,7 @@ def main():
 
     # build the dataloader
     dataset = build_dataset(cfg.data.test)
-    shuffle=False
+    shuffle = False
     if shuffle:
         dataset.flag = np.zeros(len(dataset), dtype=np.uint8)
     data_loader = build_dataloader(

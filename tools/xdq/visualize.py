@@ -8,6 +8,7 @@ from mmcv import Config
 from mmcv.parallel import MMDistributedDataParallel, MMDataParallel
 from mmcv.runner import init_dist, load_checkpoint
 
+from mmdet.apis import set_random_seed
 from mmdet3d.core import LiDARInstance3DBoxes
 from mmdet3d.core.utils import visualize_camera, visualize_lidar
 from mmdet3d.datasets import build_dataloader, build_dataset
@@ -62,12 +63,19 @@ def main():
         #     for b in intersection_files.tolist()
         # ]
         bad_cases = np.load("bad_cases.npy", allow_pickle=True)
-        bad_cases = [b[3] for b in bad_cases.tolist()]
+        bad_cases = [
+            b[3]
+            .replace("_", "/")
+            .replace("xdq/data", "xdq/annotation")
+            .replace("/norm.npy", "_norm.json")
+            for b in bad_cases.tolist()
+        ]
         dataset = build_dataset(
             cfg.data[args.dataset_split], default_args=dict(customized_files=bad_cases)
         )
     shuffle = True
     if shuffle:
+        set_random_seed(0)
         dataset.flag = np.zeros(len(dataset), dtype=np.uint8)
     data_loader = build_dataloader(
         dataset,
