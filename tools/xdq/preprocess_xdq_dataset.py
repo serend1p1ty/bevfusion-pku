@@ -15,27 +15,12 @@ from tqdm import tqdm
 # 3. Check Camera-LiDAR mismatch
 # 4. Check cid-ImgURL mismatch
 
-# calculated by cal_xyz_offset(), used to normalize point cloud to origin-centered, z=-5 grounded
-# norm_offsets = {
-#     "1": [-4.46, -34.1, 45.75],
-#     "2": [-23.32, 35.89, 45.75],
-#     "3": [-4.64, 71.39, 45.34],
-#     "7": [-17.48, -19.43, 45.19],
-#     "12": [184.74, -78.32, 45.99],
-#     "16": [33.16, 83.63, 46.91],
-#     "17": [-18.74, -35.58, 45.41],
-#     "19": [-12.4, -52.47, 46.21],
-#     "21": [12.77, 71.73, 45.6],
-#     "32": [48.12, -0.02, 45.93],
-#     "33": [-53.45, -6.59, 45.97],
-#     "34": [-8.23, -31.04, 45.71],
-#     "35": [63.23, 49.72, 46.03],
-# }
-# hand-craft
+# Used to normalize point cloud to origin-centered, z=-5 grounded.
 norm_offsets = {
     "1": [22, -70, 45.75],
     "2": [-23.32, 35.89, 45.75],
     "3": [-25, 98, 45.34],
+    "5": [30, -110, 45.56],
     "7": [-65, -31, 45.19],
     "12": [290, -120, 45.99],
     "16": [-50, 62, 46.91],
@@ -47,6 +32,31 @@ norm_offsets = {
     "34": [-9, -5, 45.71],
     "35": [55, 55, 46.03],
 }
+
+
+def get_anno_files(selected_timestamps=None, norm=False):
+    anno_files = glob(os.path.join(anno_dir, "*/*/*.json"))
+    valid_anno_files = []
+    for anno_file in anno_files:
+        # 0720 is the old annotation version
+        if "20220720" in anno_file:
+            continue
+        if norm is False:
+            if "norm" in anno_file:
+                continue
+        else:
+            if "norm" not in anno_file:
+                continue
+        if selected_timestamps is not None:
+            is_valid = False
+            for timestamp in selected_timestamps:
+                if timestamp in anno_file:
+                    is_valid = True
+                    break
+            if not is_valid:
+                continue
+        valid_anno_files.append(anno_file)
+    return valid_anno_files
 
 
 def get_points_in_box(points, box):
@@ -65,15 +75,8 @@ def get_points_in_box(points, box):
 
 def cal_xyz_offset():
     nid2offsets = {}
-    anno_files = glob(os.path.join(anno_dir, "*/*.json"))
+    anno_files = get_anno_files()
     for anno_file in tqdm(anno_files):
-        # 0720 is the old annotation version
-        if "20220720" in anno_file:
-            continue
-
-        if "norm" in anno_file:
-            continue
-
         anno = json.load(open(anno_file))
         nid = anno["nid"]
 
@@ -110,15 +113,9 @@ def cal_xyz_offset():
 
 
 def normalize_coordinate():
-    anno_files = glob(os.path.join(anno_dir, "*/*/*.json"))
+    anno_files = get_anno_files()
     invalid_files = []
     for anno_file in tqdm(anno_files):
-        if "20220720" in anno_file:
-            continue
-
-        if "norm" in anno_file:
-            continue
-
         anno = json.load(open(anno_file))
         nid = anno["nid"]
         norm_offset = norm_offsets[nid]
@@ -150,11 +147,11 @@ def normalize_coordinate():
         points += norm_offset + [0.0]
         save_path = pcd_path.replace(".npy", "_norm.npy")
         np.save(save_path, points)
-    print(invalid_files)
+    print(f"###### {len(invalid_files)} invalid files: {invalid_files[:100]}")
 
 
 def fix_cam_lidar_mismatch(fix=False):
-    anno_files = glob(os.path.join(anno_dir, "*/*/*_norm.json"))
+    anno_files = get_anno_files(norm=True)
     mismatch_num = 0
     # cam is more than lidar
     mismatch_more = []
@@ -219,8 +216,8 @@ def fix_cam_lidar_mismatch(fix=False):
                 json.dump(anno, f, indent=4)
 
 
-def attach_min_camz(plot=True, minz=20, maxz=90):
-    anno_files = glob(os.path.join(anno_dir, "*/*/*_norm.json"))
+def attach_min_camz(plot=True, minz=10, maxz=150):
+    anno_files = get_anno_files(norm=True)
     nid_set = set()
     print("Attach min camz......")
     for anno_file in tqdm(anno_files):
@@ -303,12 +300,54 @@ def attach_min_camz(plot=True, minz=20, maxz=90):
     fig.savefig("cam_train_bboxes.png")
 
 
+def remove_invalid_samples():
+    anno_files = get_anno_files()
+    delete_files = []
+    for anno_file in anno_files:
+        assert "norm" not in anno_file
+        norm_anno_file = anno_file.replace(".json", "_norm.json")
+        if not os.path.exists(norm_anno_file):
+            anno = json.load(open(anno_file))
+            pcd_relative_path = re.search(
+                "[^/?]+/[^/?]+/[^/?]+npy", anno["pcd_path"].replace(".pcd", ".npy")
+            ).group()
+            pcd_path = os.path.join(data_dir, pcd_relative_path)
+            points = np.load(pcd_path)
+            assert points.shape[0] % 24000 == 0
+            lidar_num = points.shape[0] / 24000
+            assert len(anno["lidar_objs"]) == 0 or len(anno["cams"]) != lidar_num
+            delete_files.append(anno_file)
+
+    pcd_files = glob(os.path.join(data_dir, "*/*/*.pcd"))
+    for pcd_file in pcd_files:
+        norm_npy_file = pcd_file.replace(".pcd", "_norm.npy")
+        if not os.path.exists(norm_npy_file):
+            delete_files.append(pcd_file)
+            delete_files.append(pcd_file.replace(".pcd", ".npy"))
+
+            path_prefix = "/".join(pcd_file.split("/")[:-1])
+            token = pcd_file.split("/")[-1].replace(".pcd", "")
+            img_files = [
+                os.path.join(path_prefix, f"1-{token}.jpg"),
+                os.path.join(path_prefix, f"2-{token}.jpg"),
+                os.path.join(path_prefix, f"3-{token}.jpg"),
+                os.path.join(path_prefix, f"4-{token}.jpg"),
+            ]
+            for img_file in img_files:
+                if os.path.exists(img_file):
+                    delete_files.append(img_file)
+    print(f"{len(delete_files)} delete files: {delete_files[:100]}")
+    for delete_file in delete_files:
+        os.remove(delete_file)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cal-offset", action="store_true")
     parser.add_argument("--norm", action="store_true")
     parser.add_argument("--fix-mismatch", action="store_true")
     parser.add_argument("--attach-min-camz", action="store_true")
+    parser.add_argument("--remove-invalid-samples", action="store_true")
     parser.add_argument("--dataset-dir", default="data/xdq")
     args = parser.parse_args()
 
@@ -327,5 +366,10 @@ if __name__ == "__main__":
         fix_cam_lidar_mismatch()
         exit(0)
 
+    if args.remove_invalid_samples:
+        remove_invalid_samples()
+        exit(0)
+
     if args.attach_min_camz:
         attach_min_camz()
+        exit(0)
