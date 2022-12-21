@@ -8,6 +8,7 @@ norm_offsets = {
     "1": [22, -70, 45.75],
     "2": [-23.32, 35.89, 45.75],
     "3": [-25, 98, 45.34],
+    "5": [30, -110, 45.56],
     "7": [-65, -31, 45.19],
     "12": [290, -120, 45.99],
     "16": [-50, 62, 46.91],
@@ -31,7 +32,7 @@ class_names = [
     "traffic_cone",
     "barrier",
 ]
-evaluation = dict(interval=24)
+evaluation = dict(interval=2, gpu_collect=True)
 
 dataset_type = "XdqDataset"
 data_root = "data/xdq/"
@@ -58,7 +59,7 @@ train_pipeline = [
     dict(
         type="LoadMultiViewImageFromFiles",
         project_pts_to_img_depth=True,
-        cam_depth_range=[20.0, 90.0, 1.0],
+        cam_depth_range=[10.0, 150.0, 1.0],
         norm_offsets=norm_offsets,
     ),
     dict(type="PointsRangeFilter", point_cloud_range=point_cloud_range),
@@ -102,7 +103,7 @@ data = dict(
     workers_per_gpu=6,
     train=dict(
         type=dataset_type,
-        # Map-cam projection is incorrect: 20220922#35, 20221024#3, 20221026#3
+        # Map to image projection is incorrect: 20220922#35, 20221024#3, 20221026#3, 20221117-1004#3
         timestamps=[
             "20220825",
             "20220921#2",
@@ -112,6 +113,20 @@ data = dict(
             "20221018#1/16/19/21",
             "20221024#7",
             "20221026#19",
+            "20221031-0902",
+            "20221031-0907",
+            "20221031-0908",
+            "20221031-0909",
+            "20221031-0915",
+            "20221031-0916",
+            "20221031-0923",
+            "20221031-0926",
+            "20221031-0927",
+            "20221031-0928",
+            "20221104-0929",
+            "20221107-0930",
+            "20221109-1003",
+            "20221117-1004#2/5/12/32/33",
         ],
         data_root=data_root,
         pipeline=train_pipeline,
@@ -121,6 +136,7 @@ data = dict(
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
         with_hard_boxes=True,
+        camz_range=[10.0, 150.0],
     ),
     val=dict(
         type=dataset_type,
@@ -138,6 +154,7 @@ data = dict(
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
         with_hard_boxes=True,
+        camz_range=[10.0, 150.0],
     ),
     test=dict(
         type=dataset_type,
@@ -155,5 +172,6 @@ data = dict(
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
         with_hard_boxes=True,
+        camz_range=[10.0, 150.0],
     ),
 )

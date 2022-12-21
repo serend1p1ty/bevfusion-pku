@@ -349,8 +349,55 @@ class LiftSplatShoot(nn.Module):
         # import matplotlib.pyplot as plt
         # dep = depth[0][0].max(dim=0)[1].cpu().numpy()
         # plt.imsave("depth.png", dep)
-        x = self.voxel_pooling(geom, x)
-        return x, depth
+        # x = self.voxel_pooling(geom, x)
+
+        # Instead of calling self.voxel_pooling(), we do voxel pooling outside the function
+        # to execute in-place operation to save GPU memory.
+        B, N, D, H, W, C = x.shape
+        Nprime = B * N * D * H * W
+
+        # flatten x
+        x = x.reshape(Nprime, C)
+
+        # flatten indices
+        geom = ((geom - (self.bx - self.dx / 2.0)) / self.dx).long()
+        geom = geom.view(Nprime, 3)
+        batch_ix = torch.cat(
+            [torch.full([Nprime // B, 1], ix, device=x.device, dtype=torch.long) for ix in range(B)]
+        )
+        batch_ix = batch_ix.to(geom.device)
+        geom = torch.cat((geom, batch_ix), 1)
+        # filter out points that are outside box
+        kept = (
+            (geom[:, 0] >= 0)
+            & (geom[:, 0] < self.nx[0])
+            & (geom[:, 1] >= 0)
+            & (geom[:, 1] < self.nx[1])
+            & (geom[:, 2] >= 0)
+            & (geom[:, 2] < self.nx[2])
+        )
+        assert kept.sum() != 0, "voxel_pooling failed, check img2lidar rotation & translation!"
+        x = x[kept]
+        geom = geom[kept]
+        # get tensors from the same voxel next to each other
+        ranks = (
+            geom[:, 0] * (self.nx[1] * self.nx[2] * B)
+            + geom[:, 1] * (self.nx[2] * B)
+            + geom[:, 2] * B
+            + geom[:, 3]
+        )
+        sorts = ranks.argsort()
+        x, geom, ranks = x[sorts], geom[sorts], ranks[sorts]
+        # cumsum trick
+        if not self.use_quickcumsum:
+            x, geom = cumsum_trick(x, geom, ranks)
+        else:
+            x, geom = QuickCumsum.apply(x, geom, ranks)
+
+        # griddify (B x C x Z x X x Y)
+        final = torch.zeros((B, C, self.nx[2], self.nx[0], self.nx[1]), device=x.device)
+        final[geom[:, 3], :, geom[:, 2], geom[:, 0], geom[:, 1]] = x
+        return final, depth
 
     def s2c(self, x):
         B, C, H, W, L = x.shape

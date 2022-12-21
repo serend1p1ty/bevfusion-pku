@@ -8,6 +8,7 @@ from torch import nn as nn
 from torch.nn import functional as F
 from attributedict.collections import AttributeDict
 
+from mmdet3d.core.bbox import box_np_ops as box_np_ops
 from mmdet3d.core import (
     Box3DMode,
     Coord3DMode,
@@ -499,28 +500,15 @@ class MVXTwoStageDetector(Base3DDetector):
                 outputs = self.attach_num_pts(points, outputs)
             return outputs
 
-    def get_points_in_box(self, points, box):
-        box_min_xyz = box.min(axis=0).reshape(-1)
-        box_max_xyz = box.max(axis=0).reshape(-1)
-
-        val_flag_x = np.logical_and(points[:, 0] >= box_min_xyz[0], points[:, 0] < box_max_xyz[0])
-        val_flag_y = np.logical_and(points[:, 1] >= box_min_xyz[1], points[:, 1] < box_max_xyz[1])
-        val_flag_z = np.logical_and(points[:, 2] >= box_min_xyz[2], points[:, 2] < box_max_xyz[2])
-        val_flag_merge = np.logical_and(np.logical_and(val_flag_x, val_flag_y), val_flag_z)
-
-        box_points = points[val_flag_merge]
-
-        return box_points
-
     def attach_num_pts(self, points, outputs):
         assert len(outputs) == 1
         if outputs[0]["pts_bbox"]["boxes_3d"].tensor.shape[0] == 0:
             return outputs
-        bboxes_corners = outputs[0]["pts_bbox"]["boxes_3d"].corners.numpy()
         points = points[0].cpu().numpy()
         num_pts = []
-        for bbox_corners in bboxes_corners:
-            num_pts.append(self.get_points_in_box(points, bbox_corners).shape[0])
+        boxes = outputs[0]["pts_bbox"]["boxes_3d"].tensor
+        for i in range(boxes.shape[0]):
+            num_pts.append(box_np_ops.points_in_rbbox(points, boxes[[i]].numpy()).sum())
         outputs[0]["pts_bbox"]["num_pts_3d"] = num_pts
         return outputs
 

@@ -10,6 +10,7 @@ norm_offsets = {
     "1": [22, -70, 45.75],
     "2": [-23.32, 35.89, 45.75],
     "3": [-25, 98, 45.34],
+    "5": [30, -110, 45.56],
     "7": [-65, -31, 45.19],
     "12": [290, -120, 45.99],
     "16": [-50, 62, 46.91],
@@ -125,6 +126,20 @@ data = dict(
             "20221018#1/16/19/21",
             "20221024#3/7",
             "20221026",
+            "20221031-0902",
+            "20221031-0907",
+            "20221031-0908",
+            "20221031-0909",
+            "20221031-0915",
+            "20221031-0916",
+            "20221031-0923",
+            "20221031-0926",
+            "20221031-0927",
+            "20221031-0928",
+            "20221104-0929",
+            "20221107-0930",
+            "20221109-1003",
+            "20221117-1004",
         ],
         data_root=data_root,
         pipeline=train_pipeline,
@@ -136,6 +151,7 @@ data = dict(
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
         with_hard_boxes=False,
+        # camz_range=[10, 150],
     ),
     # train=dict(
     #     type="CBGSDataset",
@@ -179,6 +195,7 @@ data = dict(
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
         with_hard_boxes=False,
+        # camz_range=[10, 150],
     ),
     test=dict(
         type=dataset_type,
@@ -196,10 +213,11 @@ data = dict(
         box_type_3d="LiDAR",
         with_unknown_boxes=False,
         with_hard_boxes=False,
+        # camz_range=[10, 150],
     ),
 )
 # For nuScenes dataset, we usually evaluate the model at the end of training.
 # Since the models are trained by 24 epochs by default, we set evaluation
 # interval to be 24. Please change the interval accordingly if you do not
 # use a default schedule.
-evaluation = dict(interval=24)
+evaluation = dict(interval=1)

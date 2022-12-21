@@ -236,7 +236,7 @@ def remove_cam_lidar_mismatch(selected_timestamps=None):
         os.remove(anno_file)
 
 
-def attach_min_camz(selected_timestamps=None, plot=True, plot_minz=10, plot_maxz=150):
+def attach_min_camz(selected_timestamps=None, plot=False, plot_minz=10, plot_maxz=150):
     print(">>> Attaching min camz...")
     anno_files = get_anno_files(selected_timestamps, norm=True)
     nid_set = set()

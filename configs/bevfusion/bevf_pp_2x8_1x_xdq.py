@@ -19,6 +19,7 @@ model = dict(
         "1": [22, -70, 45.75],
         "2": [-23.32, 35.89, 45.75],
         "3": [-25, 98, 45.34],
+        "5": [30, -110, 45.56],
         "7": [-65, -31, 45.19],
         "12": [290, -120, 45.99],
         "16": [-50, 62, 46.91],
@@ -30,7 +31,7 @@ model = dict(
         "34": [-9, -5, 45.71],
         "35": [55, 55, 46.03],
     },
-    camera_depth_range=[20.0, 90.0, 1.0],
+    camera_depth_range=[10.0, 150.0, 1.0],
     pc_range=[-160, -160, -6, 160, 160, 4],
     grid=0.8,
     ##################
@@ -173,8 +174,8 @@ model = dict(
 
 
 data = dict(
-    samples_per_gpu=2,
-    workers_per_gpu=6,
+    samples_per_gpu=1,
+    workers_per_gpu=3,
 )
 
 optimizer = dict(
@@ -191,12 +192,12 @@ optimizer = dict(
     ),
 )
 
-load_lift_from = "work_dirs/bevf_pp_4x8_2x_xdq_cam/latest.pth"  #####load cam stream
-load_from = (
-    "work_dirs/lidar-v3-hand_craft/epoch_24.pth"  #####load lidar stream
-)
-model_parallelism = True
 #### modified ####
+# load cam stream
+load_lift_from = "work_dirs/cam_frustum_10-150/latest.pth"
+# load lidar stream
+load_from = "work_dirs/lidar_frustum_10-150/latest.pth"
+model_parallelism = True
 freeze_lidar_components = True
 freeze_image_components = True
 ##################
