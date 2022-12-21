@@ -16,6 +16,7 @@ norm_offsets = {
     "1": [22, -70, 45.75],
     "2": [-23.32, 35.89, 45.75],
     "3": [-25, 98, 45.34],
+    "5": [30, -110, 45.56],
     "7": [-65, -31, 45.19],
     "12": [290, -120, 45.99],
     "16": [-50, 62, 46.91],
@@ -104,6 +105,7 @@ def project_lidar(anno_files):
 def project_map(anno_files):
     cid_to_map_points = {}
     out_dir = "vis_proj_map"
+    print(f"##### {len(anno_files)} annotation files")
     for anno_file in tqdm(anno_files):
         timestamp = re.search("([^/?]+)/[^/?]+/[^/?]+_norm.json", anno_file).group(1)
         anno = json.load(open(anno_file))
@@ -173,11 +175,11 @@ def project_map(anno_files):
             os.makedirs(ts_out_dir, exist_ok=True)
             cv2.imwrite(os.path.join(ts_out_dir, f"{cid}_map_proj.png"), img)
             plt.imsave(os.path.join(ts_out_dir, f"{cid}_depth.png"), img_depth)
-            cam_depth_range = [20, 90, 1]
-            _, min_depth, _ = generate_guassian_depth_target(
+            _, min_depth, _, _ = generate_guassian_depth_target(
                 torch.from_numpy(img_depth).unsqueeze(0),
                 stride=8,
-                cam_depth_range=cam_depth_range,
+                # does not matter
+                cam_depth_range=[10.0, 150.0, 1.0],
                 constant_std=0.5,
             )
             plt.imsave(os.path.join(ts_out_dir, f"{cid}_min_depth.png"), min_depth.squeeze())

@@ -162,6 +162,12 @@ def accumulate(
     conf_interp = np.linspace(0, 1, DetectionMetricData.nelem)
     prec_conf = np.interp(conf_interp, conf_copy[::-1], prec_copy[::-1], right=1)
     rec_conf = np.interp(conf_interp, conf_copy[::-1], rec_copy[::-1], right=0)
+    f1_conf = 2 * prec_conf * rec_conf / (prec_conf + rec_conf + 1e-5)
+    best_thresh = f1_conf.argmax()
+    print(
+        f"Best threshold for {class_name}: {best_thresh / 100}"
+        f", precision: {prec_conf[best_thresh]}, recall: {rec_conf[best_thresh]}"
+    )
     idx = np.where(conf_interp == conf_th)[0]
     ret_p, ret_r = float(prec_conf[idx]), float(rec_conf[idx])
 
