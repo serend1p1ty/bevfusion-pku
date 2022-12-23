@@ -15,6 +15,10 @@ model = dict(
     lc_fusion=True,
     camera_stream=True,
     #### modified ####
+    # load cam stream
+    lift_pretrained="work_dirs/cam_frustum_10-150/latest.pth",
+    freeze_lift=True,
+    freeze_lidar=True,
     norm_offsets={
         "1": [22, -70, 45.75],
         "2": [-23.32, 35.89, 45.75],
@@ -193,11 +197,7 @@ optimizer = dict(
 )
 
 #### modified ####
-# load cam stream
-load_lift_from = "work_dirs/cam_frustum_10-150/latest.pth"
 # load lidar stream
 load_from = "work_dirs/lidar_frustum_10-150/latest.pth"
 model_parallelism = True
-freeze_lidar_components = True
-freeze_image_components = True
 ##################

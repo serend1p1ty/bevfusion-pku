@@ -12,6 +12,9 @@ model = dict(
     se=True,
     lc_fusion=True,
     camera_stream=True,
+    #### modified ####
+    # load cam stream
+    lift_pretrained="work_dirs/pre_bevf_pp_4x8_2x_nusc_cam/epoch_24.pth",
     grid=0.5,
     num_views=6,
     final_dim=final_dim,
@@ -166,8 +169,6 @@ optimizer = dict(
     ),
 )
 
-load_lift_from = "work_dirs/pre_bevf_pp_4x8_2x_nusc_cam/epoch_24.pth"  #####load cam stream
-load_from = (
-    "work_dirs/pre_hv_pointpillars_secfpn_sbn-all_4x8_2x_nus-3d/epoch_24.pth"  #####load lidar stream
-)
+# load lidar stream
+load_from = "work_dirs/pre_hv_pointpillars_secfpn_sbn-all_4x8_2x_nus-3d/epoch_24.pth"
 model_parallelism = True

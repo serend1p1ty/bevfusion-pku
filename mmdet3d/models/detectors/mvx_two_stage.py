@@ -32,7 +32,6 @@ class MVXTwoStageDetector(Base3DDetector):
 
     def __init__(
         self,
-        freeze_img=True,
         pts_voxel_layer=None,
         pts_voxel_encoder=None,
         pts_middle_encoder=None,
@@ -50,7 +49,6 @@ class MVXTwoStageDetector(Base3DDetector):
     ):
         super(MVXTwoStageDetector, self).__init__()
 
-        self.freeze_img = freeze_img
         if pts_voxel_layer:
             self.pts_voxel_layer = Voxelization(**pts_voxel_layer)
         if pts_voxel_encoder:
@@ -113,14 +111,6 @@ class MVXTwoStageDetector(Base3DDetector):
             self.pts_bbox_head.init_weights()
         if self.with_pts_roi_head:
             self.pts_roi_head.init_weights()
-
-        if self.freeze_img:
-            if self.with_img_backbone:
-                for param in self.img_backbone.parameters():
-                    param.requires_grad = False
-            if self.with_img_neck:
-                for param in self.img_neck.parameters():
-                    param.requires_grad = False
 
     @property
     def with_pts_roi_head(self):

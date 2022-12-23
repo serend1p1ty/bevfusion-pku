@@ -1,25 +1,17 @@
 import os
 import torch
-from mmcv.runner import force_fp32
+import torch.nn as nn
+from collections import OrderedDict
+from mmcv.cnn import ConvModule
 from mmcv.parallel.scatter_gather import scatter_kwargs
 from torch.nn import functional as F
-from torch.distributions import Normal
-import numpy as np
 
-from mmdet.models import DETECTORS
 from mmdet3d.models.detectors import MVXFasterRCNN
+from mmdet3d.utils import get_root_logger
+from mmdet.models import DETECTORS
 from .cam_stream_lss import LiftSplatShoot
-from mmcv.cnn import (
-    build_conv_layer,
-    build_norm_layer,
-    build_upsample_layer,
-    constant_init,
-    is_norm,
-    kaiming_init,
-)
-from torchvision.utils import save_image
-from mmcv.cnn import ConvModule, xavier_init
-import torch.nn as nn
+
+logger = get_root_logger()
 
 
 class SE_Block(nn.Module):
@@ -42,6 +34,11 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
         lss=False,
         lc_fusion=False,
         camera_stream=False,
+        img_pretrained=None,
+        lift_pretrained=None,
+        freeze_img=True,
+        freeze_lift=False,
+        freeze_lidar=False,
         camera_depth_range=[4.0, 45.0, 1.0],
         img_depth_loss_weight=1.0,
         img_depth_loss_method="kld",
@@ -54,7 +51,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
         imc=256,
         lic=384,
         norm_offsets=None,
-        **kwargs
+        **kwargs,
     ):
         """
         Args:
@@ -65,7 +62,6 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
             grid, num_views, final_dim, pc_range, downsample: args for LSS, see cam_stream_lss.py.
             imc (int): channel dimension of camera BEV feature.
             lic (int): channel dimension of LiDAR BEV feature.
-
         """
         super(BEVF_FasterRCNN, self).__init__(**kwargs)
         self.num_views = num_views
@@ -101,21 +97,115 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
                 inplace=False,
             )
 
-        self.freeze_img = kwargs.get("freeze_img", False)
-        self.init_weights(pretrained=kwargs.get("pretrained", None))
-        self.freeze()
+        self.load_pretrained(img_pretrained, lift_pretrained)
+        self.freeze(freeze_img, freeze_lift, freeze_lidar)
 
-    def freeze(self):
-        if self.freeze_img:
+    def load_pretrained(self, img_pretrained, lift_pretrained):
+        if img_pretrained is not None:
+            logger.info(f"Loading backbone, neck from {img_pretrained}")
+            checkpoint = torch.load(img_pretrained, map_location="cpu")
+            if "state_dict" in checkpoint:
+                state_dict = checkpoint["state_dict"]
+            elif "model" in checkpoint:
+                state_dict = checkpoint["model"]
+            else:
+                state_dict = checkpoint
+            if list(state_dict.keys())[0].startswith("module."):
+                state_dict = {k[7:]: v for k, v in state_dict.items()}
+            ckpt = state_dict
+            new_ckpt = OrderedDict()
+            for k, v in ckpt.items():
+                if k.startswith("backbone"):
+                    new_v = v
+                    new_k = k.replace("backbone.", "img_backbone.")
+                elif k.startswith("neck"):
+                    new_v = v
+                    new_k = k.replace("neck.", "img_neck.")
+                else:
+                    continue
+                new_ckpt[new_k] = new_v
+            msg = self.load_state_dict(new_ckpt, strict=False)
+            logger.info(f"Loading details: {msg}")
+
+        if lift_pretrained is not None:
+            logger.info(f"Loading backbone, neck, lift from {lift_pretrained}")
+            checkpoint = torch.load(lift_pretrained, map_location="cpu")
+            if "state_dict" in checkpoint:
+                state_dict = checkpoint["state_dict"]
+            elif "model" in checkpoint:
+                state_dict = checkpoint["model"]
+            else:
+                state_dict = checkpoint
+            ckpt = state_dict
+            new_ckpt = OrderedDict()
+            for k, v in ckpt.items():
+                if k.startswith("pts_bbox_head"):
+                    continue
+                else:
+                    new_v = v
+                    new_k = k
+                new_ckpt[new_k] = new_v
+            msg = self.load_state_dict(new_ckpt, strict=False)
+            logger.info(f"Loading details: {msg}")
+
+    def freeze(self, freeze_img, freeze_lift, freeze_lidar):
+        def fix_bn(m):
+            if isinstance(m, nn.BatchNorm1d) or isinstance(m, nn.BatchNorm2d):
+                m.track_running_stats = False
+
+        if freeze_img:
             if self.with_img_backbone:
                 for param in self.img_backbone.parameters():
                     param.requires_grad = False
             if self.with_img_neck:
                 for param in self.img_neck.parameters():
                     param.requires_grad = False
-            if self.lift:
-                for param in self.lift_splat_shot_vis.parameters():
+
+        if freeze_lift and self.lift:
+            for param in self.lift_splat_shot_vis.parameters():
+                param.requires_grad = False
+            self.lift_splat_shot_vis.apply(fix_bn)
+
+        if freeze_lidar:
+            is_transfusion_head = hasattr(self.pts_bbox_head, "heatmap_head")
+            for name, param in self.named_parameters():
+                if "pts" in name and "pts_bbox_head" not in name:
                     param.requires_grad = False
+                if is_transfusion_head:
+                    if "pts_bbox_head.decoder.0" in name:
+                        param.requires_grad = False
+                    if (
+                        "pts_bbox_head.shared_conv" in name
+                        and "pts_bbox_head.shared_conv_img" not in name
+                    ):
+                        param.requires_grad = False
+                    if (
+                        "pts_bbox_head.heatmap_head" in name
+                        and "pts_bbox_head.heatmap_head_img" not in name
+                    ):
+                        param.requires_grad = False
+                    if "pts_bbox_head.prediction_heads.0" in name:
+                        param.requires_grad = False
+                    if "pts_bbox_head.class_encoding" in name:
+                        param.requires_grad = False
+
+            self.pts_voxel_layer.apply(fix_bn)
+            self.pts_voxel_encoder.apply(fix_bn)
+            self.pts_middle_encoder.apply(fix_bn)
+            self.pts_backbone.apply(fix_bn)
+            self.pts_neck.apply(fix_bn)
+
+            if is_transfusion_head:
+                self.pts_bbox_head.heatmap_head.apply(fix_bn)
+                self.pts_bbox_head.shared_conv.apply(fix_bn)
+                self.pts_bbox_head.class_encoding.apply(fix_bn)
+                self.pts_bbox_head.decoder[0].apply(fix_bn)
+                self.pts_bbox_head.prediction_heads[0].apply(fix_bn)
+
+        logger.info(f"Param need to update:")
+        for name, param in self.named_parameters():
+            if param.requires_grad is True:
+                logger.info(name)
 
     def extract_pts_feat(self, pts):
         """Extract features of points."""

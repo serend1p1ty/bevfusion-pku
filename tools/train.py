@@ -2,17 +2,16 @@ from __future__ import division
 
 import argparse
 import copy
+import json
 import logging
 import mmcv
 import os
-import json
 import time
 import torch
 import warnings
 from mmcv import Config, DictAction
 from mmcv.runner import get_dist_info, init_dist
 from os import path as osp
-from collections import OrderedDict
 
 from mmdet3d import __version__
 from mmdet3d.datasets import build_dataset
@@ -184,67 +183,10 @@ def main():
     meta["exp_name"] = osp.basename(args.config)
 
     model = build_detector(cfg.model, train_cfg=cfg.get("train_cfg"), test_cfg=cfg.get("test_cfg"))
-    # sync_bn = cfg.get('sync_bn', True)
-    # if distributed and sync_bn:
-    #     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-    #     print('Convert to SyncBatchNorm')
-
-    fix = False
-
-    if "freeze_image_components" in cfg and cfg["freeze_image_components"] is True:
-        fix = True
-        logger.info("Freeze image components")
-        fix_modules = ["img_backbone", "img_neck", "lift_splat_shot_vis"]
-        for name, param in model.named_parameters():
-            for module_name in fix_modules:
-                if module_name in name:
-                    param.requires_grad = False
-                    break
-
-    if "freeze_lidar_components" in cfg and cfg["freeze_lidar_components"] is True:
-        fix = True
-        for name, param in model.named_parameters():
-            if "pts" in name and "pts_bbox_head" not in name:
-                param.requires_grad = False
-            if "pts_bbox_head.decoder.0" in name:
-                param.requires_grad = False
-            if "pts_bbox_head.shared_conv" in name and "pts_bbox_head.shared_conv_img" not in name:
-                param.requires_grad = False
-            if (
-                "pts_bbox_head.heatmap_head" in name
-                and "pts_bbox_head.heatmap_head_img" not in name
-            ):
-                param.requires_grad = False
-            if "pts_bbox_head.prediction_heads.0" in name:
-                param.requires_grad = False
-            if "pts_bbox_head.class_encoding" in name:
-                param.requires_grad = False
-
-        from torch import nn
-
-        def fix_bn(m):
-            if isinstance(m, nn.BatchNorm1d) or isinstance(m, nn.BatchNorm2d):
-                m.track_running_stats = False
-
-        logger.info("Freeze lidar backbone")
-        model.pts_voxel_layer.apply(fix_bn)
-        model.pts_voxel_encoder.apply(fix_bn)
-        model.pts_middle_encoder.apply(fix_bn)
-        model.pts_backbone.apply(fix_bn)
-        model.pts_neck.apply(fix_bn)
-        if "TransFusion" in cfg.model.type and ("no_freeze_head" not in cfg):
-            logger.info("Freeze head")
-            model.pts_bbox_head.heatmap_head.apply(fix_bn)
-            model.pts_bbox_head.shared_conv.apply(fix_bn)
-            model.pts_bbox_head.class_encoding.apply(fix_bn)
-            model.pts_bbox_head.decoder[0].apply(fix_bn)
-            model.pts_bbox_head.prediction_heads[0].apply(fix_bn)
-
-    if fix:
-        logger.info(f"Param need to update:")
-        for name, param in model.named_parameters():
-            if param.requires_grad is True:
-                logger.info(name)
+    sync_bn = cfg.get("sync_bn", True)
+    if distributed and sync_bn:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        print("Convert to SyncBatchNorm")
 
     logger.info(f"Model:\n{model}")
     datasets = [build_dataset(cfg.data.train)]
@@ -268,69 +210,6 @@ def main():
         )
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
-
-    if "load_img_from" in cfg:
-        logger.info(f"Loading image model from {cfg.load_img_from}")
-        checkpoint = torch.load(cfg.load_img_from, map_location="cpu")
-        if "state_dict" in checkpoint:
-            state_dict = checkpoint["state_dict"]
-        elif "model" in checkpoint:
-            state_dict = checkpoint["model"]
-        else:
-            state_dict = checkpoint
-        if list(state_dict.keys())[0].startswith("module."):
-            state_dict = {k[7:]: v for k, v in state_dict.items()}
-        ckpt = state_dict
-        new_ckpt = OrderedDict()
-        for k, v in ckpt.items():
-            if k.startswith("backbone"):
-                new_v = v
-                new_k = k.replace("backbone.", "img_backbone.")
-            elif k.startswith("neck"):
-                new_v = v
-                new_k = k.replace("neck.", "img_neck.")
-            else:
-                continue
-            new_ckpt[new_k] = new_v
-        msg = model.load_state_dict(new_ckpt, strict=False)
-        logger.info(f"Loading details: {msg}")
-
-    if "load_lift_from" in cfg:
-        logger.info(f"Loading LSS model from {cfg.load_lift_from}")
-        checkpoint = torch.load(cfg.load_lift_from, map_location="cpu")
-        if "state_dict" in checkpoint:
-            state_dict = checkpoint["state_dict"]
-        elif "model" in checkpoint:
-            state_dict = checkpoint["model"]
-        else:
-            state_dict = checkpoint
-        ckpt = state_dict
-        new_ckpt = OrderedDict()
-        for k, v in ckpt.items():
-            # load the LSS model trained on nuScenes
-            # if k.startswith("pts_bbox_head") or k in [
-            #     "lift_splat_shot_vis.dx",
-            #     "lift_splat_shot_vis.bx",
-            #     "lift_splat_shot_vis.nx",
-            #     "lift_splat_shot_vis.frustum",
-            #     "lift_splat_shot_vis.camencode.depthnet.weight",
-            #     "lift_splat_shot_vis.camencode.depthnet.bias",
-            #     "lift_splat_shot_vis.bevencode.0.weight",
-            #     "lift_splat_shot_vis.bevencode.1.weight",
-            #     "lift_splat_shot_vis.bevencode.1.bias",
-            #     "lift_splat_shot_vis.bevencode.1.running_mean",
-            #     "lift_splat_shot_vis.bevencode.1.running_var",
-            #     "lift_splat_shot_vis.bevencode.3.weight",
-            # ]:
-            #     continue
-            if k.startswith('pts_bbox_head'):
-                continue
-            else:
-                new_v = v
-                new_k = k
-            new_ckpt[new_k] = new_v
-        msg = model.load_state_dict(new_ckpt, strict=False)
-        logger.info(f"Loading details: {msg}")
 
     train_detector(
         model,
