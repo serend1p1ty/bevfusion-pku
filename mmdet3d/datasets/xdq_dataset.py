@@ -53,7 +53,7 @@ def load_gt_bboxes_info(info, with_unknown_boxes=False, with_hard_boxes=False, c
     _gt_names = [obj["type"] for obj in info["lidar_objs"]]
     _gt_num_pts = [obj["num_pts"] for obj in info["lidar_objs"]]
     _gt_min_camzs = [obj["min_camz"] for obj in info["lidar_objs"]]
-    gt_bboxes_3d, gt_names_3d, gt_num_pts_3d = [], [], []
+    gt_bboxes_3d, gt_names_3d, gt_num_pts_3d, gt_min_camz_3d = [], [], [], []
     for gt_bbox, gt_name, gt_num_pts, gt_min_camz in zip(
         _gt_bboxes, _gt_names, _gt_num_pts, _gt_min_camzs
     ):
@@ -69,6 +69,7 @@ def load_gt_bboxes_info(info, with_unknown_boxes=False, with_hard_boxes=False, c
         # the box is valid
         gt_bboxes_3d.append(gt_bbox)
         gt_num_pts_3d.append(gt_num_pts)
+        gt_min_camz_3d.append(gt_min_camz)
         if gt_name == "Unknown":
             # assign class name by box length
             size_l = gt_bbox[4]
@@ -76,7 +77,7 @@ def load_gt_bboxes_info(info, with_unknown_boxes=False, with_hard_boxes=False, c
         else:
             gt_names_3d.append(mapper[gt_name])
     gt_bboxes_3d = np.array(gt_bboxes_3d)
-    return gt_bboxes_3d, gt_names_3d, gt_num_pts_3d
+    return gt_bboxes_3d, gt_names_3d, gt_num_pts_3d, gt_min_camz_3d
 
 
 class XdqDetectionEval(DetectionEval):
@@ -127,10 +128,9 @@ class XdqDetectionEval(DetectionEval):
         self.pred_boxes = self.filter_boxes(
             self.pred_boxes,
             self.cfg.class_range,
-            self.cfg.eval_dist_level,
-            self.cfg.eval_dist_interval,
-            self.cfg.eval_num_pts_level,
-            self.cfg.eval_num_pts_interval,
+            self.cfg.eval_dist_range,
+            self.cfg.eval_num_pts_range,
+            self.cfg.eval_min_camz_range,
             verbose=verbose,
         )
         if verbose:
@@ -138,10 +138,9 @@ class XdqDetectionEval(DetectionEval):
         self.gt_boxes = self.filter_boxes(
             self.gt_boxes,
             self.cfg.class_range,
-            self.cfg.eval_dist_level,
-            self.cfg.eval_dist_interval,
-            self.cfg.eval_num_pts_level,
-            self.cfg.eval_num_pts_interval,
+            self.cfg.eval_dist_range,
+            self.cfg.eval_num_pts_range,
+            self.cfg.eval_min_camz_range,
             verbose=verbose,
         )
 
@@ -151,10 +150,9 @@ class XdqDetectionEval(DetectionEval):
     def filter_boxes(
         eval_boxes,
         class_range,
-        eval_dist_level,
-        eval_dist_interval,
-        eval_num_pts_level,
-        eval_num_pts_interval,
+        eval_dist_range,
+        eval_num_pts_range,
+        eval_min_camz_range,
         verbose=False,
     ):
         """
@@ -164,7 +162,7 @@ class XdqDetectionEval(DetectionEval):
         :param verbose: Whether to print to stdout.
         """
         # Accumulators for number of filtered boxes.
-        total, max_dist_filter, dist_interval_filter, num_pts_filter = 0, 0, 0, 0
+        total, max_dist_filter, dist_range_filter, num_pts_filter, min_camz_filter = 0, 0, 0, 0, 0
         for sample_token in eval_boxes.sample_tokens:
             total += len(eval_boxes[sample_token])
 
@@ -178,36 +176,44 @@ class XdqDetectionEval(DetectionEval):
             eval_boxes.boxes[sample_token] = valid_boxes
             max_dist_filter += len(eval_boxes.boxes[sample_token])
 
-            if eval_dist_level >= 0:
+            if len(eval_dist_range) > 0:
                 # Filter on distance interval
                 valid_boxes = []
-                min_dist = eval_dist_level * eval_dist_interval
-                max_dist = (eval_dist_level + 1) * eval_dist_interval
+                min_num, max_num = eval_dist_range
                 for box in eval_boxes[sample_token]:
                     x, y, _ = box.translation
                     dist = (x**2 + y**2) ** 0.5
-                    if dist >= min_dist and dist <= max_dist:
+                    if dist >= min_num and dist <= max_num:
                         valid_boxes.append(box)
                 eval_boxes.boxes[sample_token] = valid_boxes
-            dist_interval_filter += len(eval_boxes.boxes[sample_token])
+            dist_range_filter += len(eval_boxes.boxes[sample_token])
 
-            if eval_num_pts_level >= 0:
+            if len(eval_num_pts_range) > 0:
                 # Filter on number of points
                 valid_boxes = []
-                min_num = eval_num_pts_level * eval_num_pts_interval
-                # max_num = (eval_num_pts_level + 1) * eval_num_pts_interval
+                min_num, max_num = eval_num_pts_range
                 for box in eval_boxes[sample_token]:
-                    # if box.num_pts >= min_num and box.num_pts <= max_num:
-                    if box.num_pts >= min_num:
+                    if box.num_pts >= min_num and box.num_pts <= max_num:
                         valid_boxes.append(box)
                 eval_boxes.boxes[sample_token] = valid_boxes
             num_pts_filter += len(eval_boxes.boxes[sample_token])
 
+            if len(eval_min_camz_range) > 0:
+                # Filter on number of points
+                valid_boxes = []
+                min_num, max_num = eval_min_camz_range
+                for box in eval_boxes[sample_token]:
+                    if box.min_camz >= min_num and box.min_camz <= max_num:
+                        valid_boxes.append(box)
+                eval_boxes.boxes[sample_token] = valid_boxes
+            min_camz_filter += len(eval_boxes.boxes[sample_token])
+
         if verbose:
             print("=> Original number of boxes: %d" % total)
             print("=> After max distance based filtering: %d" % max_dist_filter)
-            print("=> After distance interval based filtering: %d" % dist_interval_filter)
-            print("=> After num_pts based filtering: %d" % num_pts_filter)
+            print("=> After distance range based filtering: %d" % dist_range_filter)
+            print("=> After num_pts range based filtering: %d" % num_pts_filter)
+            print("=> After min_camz range based filtering: %d" % min_camz_filter)
 
         return eval_boxes
 
@@ -217,12 +223,14 @@ class XdqDetectionEval(DetectionEval):
     ):
         all_annotations = EvalBoxes()
         for info in data_infos:
-            gt_bboxes_3d, gt_names_3d, gt_num_pts_3d = load_gt_bboxes_info(
+            gt_bboxes_3d, gt_names_3d, gt_num_pts_3d, gt_min_camz_3d = load_gt_bboxes_info(
                 info, with_unknown_boxes, with_hard_boxes, camz_range
             )
 
             sample_boxes = []
-            for gt_bbox, gt_name, gt_num_pts in zip(gt_bboxes_3d, gt_names_3d, gt_num_pts_3d):
+            for gt_bbox, gt_name, gt_num_pts, gt_min_camz in zip(
+                gt_bboxes_3d, gt_names_3d, gt_num_pts_3d, gt_min_camz_3d
+            ):
                 yaw = -gt_bbox[-1] - np.pi / 2
                 q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=yaw).q
                 sample_boxes.append(
@@ -233,6 +241,7 @@ class XdqDetectionEval(DetectionEval):
                         rotation=q,
                         detection_name=gt_name,
                         num_pts=gt_num_pts,
+                        min_camz=gt_min_camz,
                         # mmdet yaw
                         yaw=gt_bbox[-1],
                     )
@@ -356,6 +365,7 @@ class XdqDataset(Custom3DDataset):
                         "sensor2lidar_translation": c2l_t,
                         "sensor2lidar_rotation": c2l_R,
                         "cam_intrinsic": intrinsic,
+                        "cam_extrinsic": extrinsic,
                     }
                 )
 
@@ -381,7 +391,7 @@ class XdqDataset(Custom3DDataset):
         """
         info = self.data_infos[index]
 
-        gt_bboxes_3d, gt_names_3d, gt_num_pts_3d = load_gt_bboxes_info(
+        gt_bboxes_3d, gt_names_3d, gt_num_pts_3d, _ = load_gt_bboxes_info(
             info, self.with_unknown_boxes, self.with_hard_boxes, self.camz_range
         )
 
@@ -690,6 +700,7 @@ class XdqDataset(Custom3DDataset):
                     rotation=box.orientation.elements.tolist(),
                     velocity=box.velocity[:2].tolist(),
                     num_pts=box.num_pts,
+                    min_camz=box.min_camz,
                     yaw=box.yaw,
                     detection_name=name,
                     detection_score=box.score,
@@ -769,6 +780,10 @@ def output_to_nusc_box(detection):
         num_pts = detection["num_pts_3d"]
     else:
         num_pts = [-1 for _ in range(scores.shape[0])]
+    if "min_camz" in detection:
+        min_camz = detection["min_camz"]
+    else:
+        min_camz = [-1.0 for _ in range(scores.shape[0])]
 
     box_gravity_center = box3d.gravity_center.numpy()
     box_dims = box3d.dims.numpy()
@@ -789,6 +804,7 @@ def output_to_nusc_box(detection):
             score=scores[i],
             velocity=velocity,
             num_pts=num_pts[i],
+            min_camz=min_camz[i],
             yaw=box3d.yaw.numpy()[i],
         )
         box_list.append(box)

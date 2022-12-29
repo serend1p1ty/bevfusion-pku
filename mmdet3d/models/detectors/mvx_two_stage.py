@@ -1,14 +1,12 @@
 import mmcv
 import torch
-import numpy as np
+from attributedict.collections import AttributeDict
 from mmcv.parallel import DataContainer as DC
 from mmcv.runner import force_fp32
 from os import path as osp
 from torch import nn as nn
 from torch.nn import functional as F
-from attributedict.collections import AttributeDict
 
-from mmdet3d.core.bbox import box_np_ops as box_np_ops
 from mmdet3d.core import (
     Box3DMode,
     Coord3DMode,
@@ -19,6 +17,7 @@ from mmdet3d.core import (
     show_result,
     xywhr2xyxyr,
 )
+from mmdet3d.core.bbox import box_np_ops as box_np_ops
 from mmdet3d.ops import Voxelization
 from mmdet.core import multi_apply
 from mmdet.models import DETECTORS
@@ -32,6 +31,8 @@ class MVXTwoStageDetector(Base3DDetector):
 
     def __init__(
         self,
+        # Used to calculate min_camz
+        norm_offsets=None,
         pts_voxel_layer=None,
         pts_voxel_encoder=None,
         pts_middle_encoder=None,
@@ -49,6 +50,7 @@ class MVXTwoStageDetector(Base3DDetector):
     ):
         super(MVXTwoStageDetector, self).__init__()
 
+        self.norm_offsets = norm_offsets
         if pts_voxel_layer:
             self.pts_voxel_layer = Voxelization(**pts_voxel_layer)
         if pts_voxel_encoder:
@@ -315,13 +317,7 @@ class MVXTwoStageDetector(Base3DDetector):
         return losses
 
     def forward_pts_train(
-        self,
-        pts_feats,
-        # img_feats,
-        gt_bboxes_3d,
-        gt_labels_3d,
-        img_metas,
-        gt_bboxes_ignore=None,
+        self, pts_feats, gt_bboxes_3d, gt_labels_3d, img_metas, gt_bboxes_ignore=None
     ):
         """Forward function for point cloud branch.
 
@@ -410,24 +406,19 @@ class MVXTwoStageDetector(Base3DDetector):
         proposal_list = self.img_rpn_head.get_bboxes(*proposal_inputs)
         return proposal_list
 
-    # def simple_test_pts(self, x, x_img, img_metas, rescale=False):
     def simple_test_pts(self, x, img_metas, rescale=False):
         """Test function of point cloud branch."""
-        # outs = self.pts_bbox_head(x, x_img, img_metas)
         outs = self.pts_bbox_head(x)
-        bbox_list = self.pts_bbox_head.get_bboxes(
-            # outs, img_metas, rescale=rescale)
-            *outs,
-            img_metas,
-            rescale=rescale,
-        )
+        bbox_list = self.pts_bbox_head.get_bboxes(*outs, img_metas, rescale=rescale)
 
         bbox_results = [
             bbox3d2result(bboxes, scores, labels) for bboxes, scores, labels in bbox_list
         ]
         return bbox_results
 
-    def simple_test(self, points, img_metas, img=None, rescale=False, cal_num_pts=True):
+    def simple_test(
+        self, points, img_metas, img=None, rescale=False, cal_num_pts=True, cal_min_camz=True
+    ):
         """Test function without augmentaiton."""
         if len(points) > 1:
             # Split BEV LiDAR
@@ -488,7 +479,45 @@ class MVXTwoStageDetector(Base3DDetector):
             outputs = self.simple_test_lidar_points(points, img_metas, img, rescale)
             if cal_num_pts:
                 outputs = self.attach_num_pts(points, outputs)
+            if cal_min_camz:
+                outputs = self.attach_min_camz(outputs, img_metas)
             return outputs
+
+    def attach_min_camz(self, outputs, img_metas):
+        assert len(outputs) == 1 and len(img_metas) == 1
+        all_box_corners = outputs[0]["pts_bbox"]["boxes_3d"].corners.numpy().copy()
+        norm_offset = self.norm_offsets[img_metas[0]["nid"]]
+        all_box_corners -= norm_offset
+        min_camz_list = []
+        for box_corners in all_box_corners:
+            min_camz = 1e5
+            for caminfo in img_metas[0]["caminfo"]:
+                intrinsic = caminfo["cam_intrinsic"]
+                extrinsic = caminfo["cam_extrinsic"]
+                l2c_R, l2c_t = extrinsic[:3, :3], extrinsic[:3, 3:]
+                # (3, 8)
+                cam_points = l2c_R @ box_corners.T + l2c_t
+
+                # check if the box is in the front of camera
+                _, _, camz = cam_points.mean(axis=1)
+                if camz <= 0:
+                    continue
+
+                # (8, 3)
+                img_points = (intrinsic @ cam_points).T
+                img_points[:, :2] /= img_points[:, 2:]
+
+                # check if the box is visible in image
+                h, w = 1080, 1920
+                min_x, min_y = img_points[:, :2].min(axis=0)
+                max_x, max_y = img_points[:, :2].min(axis=0)
+                if min_x >= w or max_x < 0 or min_y >= h or max_y < 0:
+                    continue
+
+                min_camz = min(min_camz, camz)
+            min_camz_list.append(-1 if min_camz == 1e5 else min_camz)
+        outputs[0]["pts_bbox"]["min_camz"] = min_camz_list
+        return outputs
 
     def attach_num_pts(self, points, outputs):
         assert len(outputs) == 1
@@ -507,12 +536,7 @@ class MVXTwoStageDetector(Base3DDetector):
 
         bbox_list = [dict() for i in range(len(img_metas))]
         if pts_feats and self.with_pts_bbox:
-            bbox_pts = self.simple_test_pts(
-                # pts_feats, img_feats, img_metas, rescale=rescale)
-                pts_feats,
-                img_metas,
-                rescale=rescale,
-            )
+            bbox_pts = self.simple_test_pts(pts_feats, img_metas, rescale=rescale)
             for result_dict, pts_bbox in zip(bbox_list, bbox_pts):
                 result_dict["pts_bbox"] = pts_bbox
         if img_feats and self.with_img_bbox:

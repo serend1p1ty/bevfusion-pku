@@ -301,16 +301,10 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
         feature_dict = self.extract_feat(points, img=img, img_metas=img_metas)
         img_feats = feature_dict["img_feats"]
         pts_feats = feature_dict["pts_feats"]
-        depth_dist = feature_dict["depth_dist"]
 
         bbox_list = [dict() for i in range(len(img_metas))]
         if pts_feats and self.with_pts_bbox:
-            bbox_pts = self.simple_test_pts(
-                # pts_feats, img_feats, img_metas, rescale=rescale)
-                pts_feats,
-                img_metas,
-                rescale=rescale,
-            )
+            bbox_pts = self.simple_test_pts(pts_feats, img_metas, rescale=rescale)
             for result_dict, pts_bbox in zip(bbox_list, bbox_pts):
                 result_dict["pts_bbox"] = pts_bbox
         if img_feats and self.with_img_bbox:

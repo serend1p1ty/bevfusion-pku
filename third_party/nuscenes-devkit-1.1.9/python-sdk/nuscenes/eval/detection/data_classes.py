@@ -24,10 +24,9 @@ class DetectionConfig:
         min_precision: float,
         max_boxes_per_sample: int,
         mean_ap_weight: int,
-        eval_dist_level: int,
-        eval_dist_interval: float,
-        eval_num_pts_level: int,
-        eval_num_pts_interval: int,
+        eval_dist_range: List[float],
+        eval_num_pts_range: List[int],
+        eval_min_camz_range: List[float],
     ):
 
         assert set(class_range.keys()) == set(DETECTION_NAMES), "Class count mismatch."
@@ -43,10 +42,9 @@ class DetectionConfig:
         self.mean_ap_weight = mean_ap_weight
 
         self.class_names = self.class_range.keys()
-        self.eval_dist_level = eval_dist_level
-        self.eval_dist_interval = eval_dist_interval
-        self.eval_num_pts_level = eval_num_pts_level
-        self.eval_num_pts_interval = eval_num_pts_interval
+        self.eval_dist_range = eval_dist_range
+        self.eval_num_pts_range = eval_num_pts_range
+        self.eval_min_camz_range = eval_min_camz_range
 
     def __eq__(self, other):
         eq = True
@@ -79,10 +77,9 @@ class DetectionConfig:
             content["min_precision"],
             content["max_boxes_per_sample"],
             content["mean_ap_weight"],
-            content["eval_dist_level"],
-            content["eval_dist_interval"],
-            content["eval_num_pts_level"],
-            content["eval_num_pts_interval"],
+            content["eval_dist_range"],
+            content["eval_num_pts_range"],
+            content["eval_min_camz_range"],
         )
 
     @property
@@ -380,6 +377,8 @@ class DetectionBox(EvalBox):
         ego_translation: Tuple[float, float, float] = (0, 0, 0),
         # Nbr. LIDAR or RADAR inside the box. Only for gt boxes.
         num_pts: int = -1,
+        # Distance from the nearest camera
+        min_camz: float = -1.0,
         # Yaw in mmdet format
         yaw: float = 0.0,
         # The class name used in the detection challenge.
@@ -391,6 +390,7 @@ class DetectionBox(EvalBox):
     ):
 
         self.yaw = yaw
+        self.min_camz = min_camz
         super().__init__(
             sample_token, translation, size, rotation, velocity, ego_translation, num_pts
         )
@@ -421,6 +421,7 @@ class DetectionBox(EvalBox):
             and self.velocity == other.velocity
             and self.ego_translation == other.ego_translation
             and self.num_pts == other.num_pts
+            and self.min_camz == other.min_camz
             and self.detection_name == other.detection_name
             and self.detection_score == other.detection_score
             and self.attribute_name == other.attribute_name
@@ -436,6 +437,7 @@ class DetectionBox(EvalBox):
             "velocity": self.velocity,
             "ego_translation": self.ego_translation,
             "num_pts": self.num_pts,
+            "min_camz": self.min_camz,
             "detection_name": self.detection_name,
             "detection_score": self.detection_score,
             "attribute_name": self.attribute_name,
@@ -455,6 +457,7 @@ class DetectionBox(EvalBox):
             if "ego_translation" not in content
             else tuple(content["ego_translation"]),
             num_pts=-1 if "num_pts" not in content else int(content["num_pts"]),
+            min_camz=-1.0 if "min_camz" not in content else float(content["min_camz"]),
             detection_name=content["detection_name"],
             detection_score=-1.0
             if "detection_score" not in content
