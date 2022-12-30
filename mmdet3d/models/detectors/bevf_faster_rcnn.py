@@ -11,8 +11,6 @@ from mmdet3d.utils import get_root_logger
 from mmdet.models import DETECTORS
 from .cam_stream_lss import LiftSplatShoot
 
-logger = get_root_logger()
-
 
 class SE_Block(nn.Module):
     def __init__(self, c):
@@ -101,6 +99,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
         self.freeze(freeze_img, freeze_lift, freeze_lidar)
 
     def load_pretrained(self, img_pretrained, lift_pretrained):
+        logger = get_root_logger()
         if img_pretrained is not None:
             logger.info(f"Loading backbone, neck from {img_pretrained}")
             checkpoint = torch.load(img_pretrained, map_location="cpu")
@@ -149,6 +148,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
             logger.info(f"Loading details: {msg}")
 
     def freeze(self, freeze_img, freeze_lift, freeze_lidar):
+        logger = get_root_logger()
         def fix_bn(m):
             if isinstance(m, nn.BatchNorm1d) or isinstance(m, nn.BatchNorm2d):
                 m.track_running_stats = False
