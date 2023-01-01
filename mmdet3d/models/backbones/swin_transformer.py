@@ -12,7 +12,7 @@ import torch.utils.checkpoint as checkpoint
 import numpy as np
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 
-from third_party.mmcv_custom import load_checkpoint
+from third_party.mmcv import load_checkpoint
 from mmdet.utils import get_root_logger
 from mmdet.models.builder import BACKBONES
 
