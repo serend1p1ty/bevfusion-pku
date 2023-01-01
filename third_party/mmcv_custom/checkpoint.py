@@ -101,7 +101,6 @@ def load_state_dict(module, state_dict, strict=False, logger=None):
 
 
 def load_url_dist(url, model_dir=None):
-    print(model_dir, url)
     """In distributed setting, this function only download checkpoint at local
     rank 0."""
     rank, world_size = get_dist_info()
@@ -308,6 +307,12 @@ def load_checkpoint(model, filename, map_location="cpu", strict=False, logger=No
     if list(state_dict.keys())[0].startswith("module."):
         state_dict = {k[7:]: v for k, v in state_dict.items()}
 
+    # for MoBY, load model of online branch
+    if sorted(list(state_dict.keys()))[0].startswith("encoder"):
+        state_dict = {
+            k.replace("encoder.", ""): v for k, v in state_dict.items() if k.startswith("encoder.")
+        }
+
     # reshape absolute position embedding
     if state_dict.get("absolute_pos_embed") is not None:
         absolute_pos_embed = state_dict["absolute_pos_embed"]
@@ -321,9 +326,8 @@ def load_checkpoint(model, filename, map_location="cpu", strict=False, logger=No
             )
 
     # interpolate position bias table if needed
-    # relative_position_bias_table_keys = [k for k in state_dict.keys() if "relative_position_bias_table" in k]
     relative_position_bias_table_keys = [
-        k for k in model.state_dict().keys() if "relative_position_bias_table" in k
+        k for k in state_dict.keys() if "relative_position_bias_table" in k
     ]
     for table_key in relative_position_bias_table_keys:
         table_pretrained = state_dict[table_key]
