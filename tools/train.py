@@ -183,7 +183,7 @@ def main():
     meta["exp_name"] = osp.basename(args.config)
 
     model = build_detector(cfg.model, train_cfg=cfg.get("train_cfg"), test_cfg=cfg.get("test_cfg"))
-    sync_bn = cfg.get("sync_bn", True)
+    sync_bn = cfg.get("sync_bn", False)
     if distributed and sync_bn:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         print("Convert to SyncBatchNorm")

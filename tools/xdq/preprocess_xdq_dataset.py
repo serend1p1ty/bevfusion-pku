@@ -386,6 +386,53 @@ def remove_null_type_boxes(selected_timestamps=None):
     print(f"Total {num_null_boxes} null boxes")
 
 
+def _parse_anno_file(anno_file):
+    res = re.search("/([0-9-]+)/([0-9]+)/([0-9]+)\.([0-9]+)_norm.json", anno_file)
+    date, nid, seconds, nanoseconds = res.group(1), res.group(2), res.group(3), res.group(4)
+    assert int(nid) <= 35
+    assert len(seconds) == 10 and len(nanoseconds) == 9
+    return date, nid, int(seconds), int(nanoseconds)
+
+
+def _is_continuous(anno_file1, anno_file2):
+    date1, nid1, seconds1, nanoseconds1 = _parse_anno_file(anno_file1)
+    date2, nid2, seconds2, nanoseconds2 = _parse_anno_file(anno_file2)
+    if date1 != date2 or nid1 != nid2:
+        return False
+    if seconds2 != seconds1:
+        assert seconds2 > seconds1
+    else:
+        assert nanoseconds2 > nanoseconds1
+    if seconds2 - seconds1 <= 1:
+        return True
+    return False
+
+
+def add_temporal_info(selected_timestamps=None, max_sweeps=10):
+    print(">>> Add temporal info...")
+    anno_files = sorted(get_anno_files(selected_timestamps, norm=True))
+    sweeps = []
+    scene_idx = 0
+    for i, anno_file in tqdm(enumerate(anno_files)):
+        _, _, seconds, nanoseconds = _parse_anno_file(anno_file)
+
+        anno = json.load(open(anno_file))
+        anno["timestamp"] = f"{seconds}.{nanoseconds}"
+        anno["sweeps"] = sweeps
+        anno["scene_idx"] = scene_idx
+
+        with open(anno_file, "w") as f:
+            json.dump(anno, f, indent=4)
+
+        if i + 1 < len(anno_files) and _is_continuous(anno_file, anno_files[i + 1]):
+            sweeps.append(anno_file)
+            if len(sweeps) > max_sweeps:
+                sweeps = sweeps[1:]
+        else:
+            sweeps = []
+            scene_idx += 1
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cal-norm-offset", action="store_true")
@@ -395,6 +442,7 @@ if __name__ == "__main__":
     parser.add_argument("--attach-min-camz", action="store_true")
     parser.add_argument("--remove-invalid-samples", action="store_true")
     parser.add_argument("--remove-null-type-boxes", action="store_true")
+    parser.add_argument("--add-temporal-info", action="store_true")
     parser.add_argument("--full-process", action="store_true")
     parser.add_argument("--incremental-process", nargs="+", type=str, default=None)
     parser.add_argument("--dataset-dir", default="data/xdq")
@@ -438,6 +486,10 @@ if __name__ == "__main__":
         # 6. Calculate the shortest distance from each box to all cameras,
         # and attach the distance to annotation file.
         attach_min_camz(selected_timestamps)
+        exit(0)
+
+    if args.add_temporal_info:
+        add_temporal_info()
         exit(0)
 
     if args.cal_norm_offset:

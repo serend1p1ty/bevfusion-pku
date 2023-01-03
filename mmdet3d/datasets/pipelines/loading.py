@@ -635,6 +635,8 @@ class LoadPointsFromMultiSweeps(object):
         Returns:
             np.ndarray: An array containing point clouds data.
         """
+        if pts_filename.endswith(".npy"):
+            return np.load(pts_filename)
         if self.file_client is None:
             self.file_client = mmcv.FileClient(**self.file_client_args)
         try:
@@ -762,14 +764,21 @@ class LoadPointsFromMultiSweeps(object):
                     )
                 for idx in choices:
                     sweep = results["sweeps"][idx]
-                    points_sweep = self._load_points(sweep["data_path"])
-                    points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
+                    is_xdq = isinstance(sweep, str)
+                    if is_xdq:
+                        points_sweep = self._load_points(sweep)
+                        padding = np.zeros((points_sweep.shape[0], 1))
+                        points_sweep = np.hstack((points_sweep, padding))
+                    else:
+                        points_sweep = self._load_points(sweep["data_path"])
+                        points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
                     if self.remove_close:
                         points_sweep = self._remove_close(points_sweep)
-                    sweep_ts = sweep["timestamp"] / 1e6
-                    points_sweep[:, :3] = points_sweep[:, :3] @ sweep["sensor2lidar_rotation"].T
-                    points_sweep[:, :3] += sweep["sensor2lidar_translation"]
-                    points_sweep[:, 4] = ts - sweep_ts
+                    if not is_xdq:
+                        sweep_ts = sweep["timestamp"] / 1e6
+                        points_sweep[:, :3] = points_sweep[:, :3] @ sweep["sensor2lidar_rotation"].T
+                        points_sweep[:, :3] += sweep["sensor2lidar_translation"]
+                        points_sweep[:, 4] = ts - sweep_ts
                     points_sweep = points.new_point(points_sweep)
                     sweep_points_list.append(points_sweep)
 

@@ -322,12 +322,21 @@ class XdqDataset(Custom3DDataset):
     def get_data_info(self, index):
         info = self.data_infos[index]
 
+        sweeps = []
+        for sweep_file in info["sweeps"]:
+            anno = json.load(open(sweep_file))
+            pcd_relative_path = re.search(
+                "[^/?]+/[^/?]+/[^/?]+npy", anno["pcd_path"].replace(".pcd", "_norm.npy")
+            ).group()
+            pcd_path = osp.join(self.data_dir, pcd_relative_path)
+            sweeps.append(pcd_path)
+
         input_dict = dict(
             sample_idx=info["token"],
             nid=info["nid"],
             pts_filename=info["lidar_path"],
-            sweeps=[],
-            timestamp=0,
+            sweeps=sweeps,
+            timestamp=info["timestamp"],
         )
 
         if self.modality["use_camera"]:
