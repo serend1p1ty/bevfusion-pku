@@ -149,6 +149,7 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
 
     def freeze(self, freeze_img, freeze_lift, freeze_lidar):
         logger = get_root_logger()
+
         def fix_bn(m):
             if isinstance(m, nn.BatchNorm1d) or isinstance(m, nn.BatchNorm2d):
                 m.track_running_stats = False
@@ -224,18 +225,13 @@ class BEVF_FasterRCNN(MVXFasterRCNN):
         """Extract features from images and points."""
         if "MODEL_PARALLELISM" in os.environ:
             device1 = int(os.environ["DEVICE_ID1"])
-            # [2, 6, 3, 448, 800]
-            # img = img.cuda(device1)
             for i, _ in enumerate(img):
                 img[i] = img[i].cuda(device1).unsqueeze(0)
-            # [[352164, 4], [366130, 4]]
             for i, _ in enumerate(points):
                 points[i] = points[i].cuda(device1)
         else:
             for i, _ in enumerate(img):
                 img[i] = img[i].unsqueeze(0)
-        # [[12, 256, 112, 200]]
-        # img_feats = self.extract_img_feat(img, img_metas)
         num_views_per_sample = []
         img_feats_list = []
         for i, img_i in enumerate(img):

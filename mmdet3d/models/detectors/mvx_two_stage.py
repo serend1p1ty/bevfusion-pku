@@ -334,9 +334,6 @@ class MVXTwoStageDetector(Base3DDetector):
         Returns:
             dict: Losses of each branch.
         """
-        # outs = self.pts_bbox_head(pts_feats, img_feats, img_metas)
-        # loss_inputs = [gt_bboxes_3d, gt_labels_3d, outs]
-        # losses = self.pts_bbox_head.loss(*loss_inputs)
         # cls_score, bbox_pred, dir_pred
         # [[[2, 140, 200, 200]], [[2, 126, 200, 200]], [[2, 28, 200, 200]]]
         outs = self.pts_bbox_head(pts_feats)
